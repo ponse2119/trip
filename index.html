@@ -36,6 +36,7 @@ nav.tabs button[aria-selected=true]{background:var(--ac);color:var(--acink)}
 .cost{display:inline-block;background:color-mix(in srgb,var(--sun) 30%,transparent);border-radius:8px;padding:0 8px;font-size:13px;margin-top:4px}
 .chk{width:24px;height:24px;accent-color:var(--ac);margin-top:2px;flex:0 0 auto}
 .del{border:0;background:none;color:var(--sub);font-size:20px;line-height:1;padding:2px 6px;cursor:pointer}
+.add select{border:1px solid var(--line);background:var(--card);border-radius:12px;padding:0 8px;font-size:15px}
 .mini{border:1px solid var(--line);background:var(--card);border-radius:10px;padding:4px 10px;font-size:13px;cursor:pointer}
 .map{color:var(--ac);text-decoration:underline;text-underline-offset:3px}
 .empty{text-align:center;color:var(--sub);padding:36px 12px;border:2px dashed var(--line);border-radius:16px}
@@ -81,7 +82,8 @@ dialog input,dialog textarea,dialog select{width:100%;border:1px solid var(--lin
   <div id="list"></div>
 </section>
 <section id="pack" hidden>
-  <form class="add" id="packForm"><input id="packIn" placeholder="持ち物を追加" aria-label="持ち物"><button>追加</button></form>
+  <form class="add" id="packForm"><input id="packIn" placeholder="持ち物を追加" aria-label="持ち物"><select id="packOwner" aria-label="誰の持ち物"><option value="0"></option><option value="1"></option><option value="2">共用</option></select><button>追加</button></form>
+  <div class="days" id="packTabs"></div>
   <div id="packList"></div>
 </section>
 <section id="cost" hidden></section>
@@ -165,13 +167,21 @@ function renderList(){
     <button class="del" data-x="${x.id}" aria-label="削除">×</button>
   </div>`).join(''):`<div class="empty">この日の予定はまだありません。<br>「＋ 予定を追加」から入れてみましょう。</div>`;
 }
+let packF='all';
 function renderPack(){
-  $('packList').innerHTML=S.pack.length?S.pack.map(p=>`
+  const N=S.names,lab=['自分用','彼女用','共用'].map((t,i)=>i<2?N[i]+'用':t);
+  [0,1,2].forEach(i=>{$('packOwner').options[i].textContent=lab[i]});
+  const own=p=>p.o===undefined||p.o===''?'2':String(p.o);
+  const cnt=k=>S.pack.filter(p=>k==='all'||own(p)===k).length;
+  $('packTabs').innerHTML=[['all','すべて'],['0',lab[0]],['1',lab[1]],['2','共用']].map(([k,t])=>`<button data-pf="${k}" aria-pressed="${packF===k}">${esc(t)}<small>${cnt(k)}件</small></button>`).join('');
+  const L=S.pack.filter(p=>packF==='all'||own(p)===packF);
+  $('packList').innerHTML=L.length?L.map(p=>`
   <div class="item ${p.done?'done':''}" style="align-items:center">
     <input type="checkbox" class="chk" data-pc="${p.id}" ${p.done?'checked':''} aria-label="準備OK">
     <div class="body t">${esc(p.t)}</div>
+    <button class="mini" data-po="${p.id}" aria-label="持ち主を変える">${esc(lab[+own(p)])}</button>
     <button class="del" data-px="${p.id}" aria-label="削除">×</button>
-  </div>`).join(''):`<div class="empty">持ち物リストは空です。<br>充電器やパスポートなど、忘れ物防止に。</div>`;
+  </div>`).join(''):`<div class="empty">${S.pack.length?'この分類の持ち物はありません。':'持ち物リストは空です。<br>充電器やパスポートなど、忘れ物防止に。'}</div>`;
 }
 function renderCost(){
   const N=S.names,c=x=>+x.cost||0;
@@ -223,13 +233,16 @@ $('f').onsubmit=e=>{
   let it;if(editId){it=S.items.find(i=>i.id===editId);Object.assign(it,v)}else{it={id:uid(),day:cur,done:false,...v};S.items.push(it)}
   putItem(it);renderList();renderCost();
 };
-$('packForm').onsubmit=e=>{e.preventDefault();const v=$('packIn').value.trim();if(!v)return;const p={id:uid(),t:v,done:false};S.pack.push(p);$('packIn').value='';putPack(p);renderPack()};
+$('packForm').onsubmit=e=>{e.preventDefault();const v=$('packIn').value.trim();if(!v)return;const p={id:uid(),t:v,done:false,o:$('packOwner').value};S.pack.push(p);$('packIn').value='';putPack(p);renderPack()};
+$('packTabs').onclick=e=>{const b=e.target.closest('button');if(!b)return;packF=b.dataset.pf;if(packF!=='all')$('packOwner').value=packF;renderPack()};
 $('packList').onclick=e=>{
+  const po=e.target.closest('[data-po]');
+  if(po){const p=S.pack.find(p=>p.id===po.dataset.po);p.o=String(((p.o===undefined||p.o===''?2:+p.o)+1)%3);putPack(p);renderPack();return}
   const c=e.target.closest('[data-pc]'),x=e.target.closest('[data-px]');
   if(c){const p=S.pack.find(p=>p.id===c.dataset.pc);p.done=c.checked;putPack(p);renderPack()}
   else if(x){rmPack(x.dataset.px);S.pack=S.pack.filter(p=>p.id!==x.dataset.px);renderPack()}
 };
-$('cost').onchange=e=>{const i=e.target.dataset.n;if(i===undefined)return;S.names[+i]=e.target.value.trim()||(i==='0'?'自分':'彼女');syncMeta();renderCost();renderList()};
+$('cost').onchange=e=>{const i=e.target.dataset.n;if(i===undefined)return;S.names[+i]=e.target.value.trim()||(i==='0'?'自分':'彼女');syncMeta();renderCost();renderList();renderPack()};
 $('cp').onclick=async()=>{try{await navigator.clipboard.writeText(location.href);$('cp').textContent='コピーしました'}catch(e){prompt('このリンクを彼女に送ってください',location.href)}};
 $('sw').onclick=()=>{const v=prompt('彼女から届いたリンクかコードを貼り付けてください');if(!v)return;const m=v.trim().match(/([A-Za-z0-9_-]{12,40})$/);if(!m)return alert('コードが正しくありません');try{localStorage.setItem(TK,m[1])}catch(e){}location.hash='t='+m[1];location.reload()};
 all();
