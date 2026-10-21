@@ -95,6 +95,7 @@ dialog:focus{outline:none}
 <body>
 <main>
 <header>
+  <div style="display:flex;justify-content:flex-end"><button class="mini" id="trips" type="button">旅の一覧 ▾</button></div>
   <input id="title" aria-label="旅のタイトル" placeholder="旅のタイトル" maxlength="40">
   <div class="meta">
     <label style="margin:0">出発日 <input type="date" id="start"></label>
@@ -138,6 +139,12 @@ dialog:focus{outline:none}
     </div>
     <div class="acts"><button type="button" id="mcancel">キャンセル</button><button class="pri">予定に入れる</button></div>
   </form>
+</dialog>
+
+<dialog id="dlgT" autofocus tabindex="-1">
+  <h2>旅の一覧</h2>
+  <div id="tlist"></div>
+  <div class="acts"><button type="button" id="tclose">閉じる</button><button type="button" class="pri" id="tnew">＋ 新しい旅</button></div>
 </dialog>
 
 <dialog id="dlgP" autofocus tabindex="-1" style="padding:10px"><img id="pimg" alt="写真" style="width:100%;max-height:80vh;object-fit:contain;border-radius:12px;display:block"><div class="acts"><button type="button" id="pclose">閉じる</button></div></dialog>
@@ -198,6 +205,7 @@ function dayLabel(i){const d=dayDate(i);return d?`${d.getMonth()+1}/${d.getDate(
 function dayWk(i){const d=dayDate(i);return d?W[d.getDay()]:''}
 
 function head(){
+  const te=trips.find(t=>t.id===TID);if(te&&te.name!==S.title){te.name=S.title;saveTrips()}
   if(document.activeElement!==$('title'))$('title').value=S.title;$('start').value=S.start;$('ndays').value=S.days;
   const c=$('countdown');
   if(S.start){const t=new Date();t.setHours(0,0,0,0);const n=Math.round((new Date(S.start+'T00:00:00')-t)/864e5);
@@ -267,6 +275,26 @@ function renderCost(){
   <div class="meta" style="margin-top:10px"><label style="margin:0">名前 <input data-n="0" value="${esc(N[0])}" maxlength="10" style="width:90px"></label><label style="margin:0"><input data-n="1" value="${esc(N[1])}" maxlength="10" style="width:90px"></label></div></div>
   <div class="sum"><div style="font-weight:700;margin-bottom:4px">日ごとの費用</div>${per.map((v,i)=>`<div class="line"><span>${i+1}日目 ${dayLabel(i)}</span><span>${yen(v)}</span></div>`).join('')}</div>`;
 }
+const TL='futari-trips';
+let trips=[];try{trips=JSON.parse(localStorage.getItem(TL)||'[]')}catch(e){}
+if(!Array.isArray(trips))trips=[];
+const saveTrips=()=>{try{localStorage.setItem(TL,JSON.stringify(trips))}catch(e){}};
+let ent=trips.find(t=>t.id===TID);
+if(!ent){ent={id:TID,name:S.title||'ふたりの旅'};trips.push(ent);saveTrips()}
+Object.assign(S,{title:ent.name||'ふたりの旅',start:'',days:3,names:['自分','彼女'],items:[],pack:[],wish:[]});
+const newId=()=>Array.from(crypto.getRandomValues(new Uint8Array(20)),b=>'abcdefghijkmnpqrstuvwxyz23456789'[b%32]).join('');
+function goTrip(id){try{localStorage.setItem(TK,id)}catch(e){}location.hash='t='+id;location.reload()}
+function renderTrips(){
+  $('tlist').innerHTML=trips.map(t=>`<div class="item" style="align-items:center${t.id===TID?';border-color:var(--ac)':''}"><div class="body" data-to="${t.id}" style="cursor:pointer"><div class="t">${esc(t.name||'無題の旅')}</div><div class="sub">${t.id===TID?'表示中':'タップして開く'}</div></div>${t.id===TID?'':`<button class="del" data-tx="${t.id}" aria-label="一覧から外す">×</button>`}</div>`).join('');
+}
+$('trips').onclick=()=>{renderTrips();$('dlgT').showModal();if(document.activeElement&&document.activeElement!==$('dlgT'))document.activeElement.blur()};
+$('tclose').onclick=()=>$('dlgT').close();
+$('tnew').onclick=()=>{const id=newId();trips.push({id,name:'新しい旅'});saveTrips();goTrip(id)};
+$('tlist').onclick=e=>{
+  const o=e.target.closest('[data-to]'),x=e.target.closest('[data-tx]');
+  if(o){if(o.dataset.to===TID)$('dlgT').close();else goTrip(o.dataset.to)}
+  else if(x&&confirm('この旅を一覧から外しますか？\n（データは消えません。リンクがあれば、また開けます）')){trips=trips.filter(t=>t.id!==x.dataset.tx);saveTrips();renderTrips()}
+};
 let editPh=[];
 function renderPh(){
   $('phs').innerHTML=editPh.map((p,i)=>`<div class="ph"><img src="${p}" alt="写真"><button type="button" data-pd="${i}" aria-label="写真を削除">×</button></div>`).join('')+(editPh.length<4?'<button type="button" class="phadd" id="phadd" aria-label="写真を追加">＋</button>':'');
@@ -394,7 +422,7 @@ all();
   db.doc('trip/meta').onSnapshot(s=>{
     if(s.exists){const d=s.data();S.title=d.title??S.title;S.start=d.start||'';S.days=d.days||S.days;if(d.names)S.names=d.names;if(cur>=S.days)cur=S.days-1;all()}
     else{db.doc('trip/meta').set({title:S.title,start:S.start,days:S.days,names:S.names}).catch(ig);
-      S.items.forEach(it=>db.collection('items').doc(it.id).set(it).catch(ig));S.pack.forEach(p=>db.collection('pack').doc(p.id).set(p).catch(ig))}
+      }
   },ig);
   db.collection('items').onSnapshot(q=>{S.items=q.docs.map(d=>d.data());renderList();renderCost()},ig);
   db.collection('pack').onSnapshot(q=>{S.pack=q.docs.map(d=>d.data());renderPack()},ig);
