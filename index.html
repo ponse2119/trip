@@ -37,6 +37,7 @@ nav.tabs button[aria-selected=true]{background:var(--ac);color:var(--acink)}
 .chk{width:24px;height:24px;accent-color:var(--ac);margin-top:2px;flex:0 0 auto}
 .del{border:0;background:none;color:var(--sub);font-size:20px;line-height:1;padding:2px 6px;cursor:pointer}
 .mini{border:1px solid var(--line);background:var(--card);border-radius:10px;padding:4px 10px;font-size:13px;cursor:pointer}
+.map{color:var(--ac);text-decoration:underline;text-underline-offset:3px}
 .empty{text-align:center;color:var(--sub);padding:36px 12px;border:2px dashed var(--line);border-radius:16px}
 .fab{position:fixed;right:max(16px,calc(50% - 264px));bottom:calc(20px + env(safe-area-inset-bottom,0px));background:var(--ac);color:var(--acink);border:0;border-radius:28px;padding:14px 22px;font-weight:700;box-shadow:0 6px 18px rgba(0,0,0,.22);cursor:pointer}
 dialog{border:0;border-radius:20px;background:var(--card);color:var(--ink);width:calc(100% - 24px);max-width:520px;padding:18px;margin:auto auto 12px}
@@ -156,7 +157,7 @@ function renderList(){
     <div class="time">${x.time||'--:--'}</div>
     <div class="body" data-e="${x.id}" style="cursor:pointer">
       <div class="t">${esc(x.title)}</div>
-      ${x.place?`<div class="sub">📍 ${esc(x.place)}</div>`:''}
+      ${x.place?`<div class="sub"><a class="map" target="_blank" rel="noopener" href="https://maps.apple.com/?q=${encodeURIComponent(x.place)}">📍 ${esc(x.place)}</a></div>`:''}
       ${x.note?`<div class="sub">${esc(x.note)}</div>`:''}
       ${x.cost?`<span class="cost">${yen(x.cost)}</span>`:''}
     </div>
@@ -190,6 +191,7 @@ document.querySelector('.tabs').onclick=e=>{const b=e.target.closest('button');i
   $('fab').hidden=b.dataset.tab!=='plan';};
 $('days').onclick=e=>{const b=e.target.closest('button');if(!b)return;cur=+b.dataset.d;renderDays();renderList()};
 $('list').onclick=e=>{
+  if(e.target.closest('a.map'))return;
   const c=e.target.closest('[data-c]'),x=e.target.closest('[data-x]'),ed=e.target.closest('[data-e]');
   if(c){const it=S.items.find(i=>i.id===c.dataset.c);it.done=c.checked;putItem(it);renderList()}
   else if(x){if(confirm('この予定を削除しますか？')){rmItem(x.dataset.x);S.items=S.items.filter(i=>i.id!==x.dataset.x);renderList();renderCost()}}
