@@ -122,7 +122,7 @@ dialog:focus{outline:none}
   <div id="list"></div>
 </section>
 <section id="wish" hidden>
-  <form class="add" id="wishForm" style="flex-wrap:wrap"><input id="wishT" style="flex:1 1 100%" required maxlength="60" placeholder="行きたい場所・やりたいこと" aria-label="候補"><input id="wishP" maxlength="80" placeholder="場所（任意）" aria-label="場所"><button>追加</button></form>
+  <form class="add" id="wishForm" style="flex-wrap:wrap"><input id="wishT" style="flex:1 1 100%" required maxlength="60" placeholder="行きたい場所・やりたいこと" aria-label="候補"><div class="row" style="flex:1 1 100%"><select id="wishDay" aria-label="何日目"></select><input id="wishP" maxlength="80" placeholder="場所（任意）" aria-label="場所"></div><button id="wishSubmit">候補を追加</button><button type="button" class="mini" id="wishCancel" hidden>編集をキャンセル</button></form>
   <div id="wishList"></div>
 </section>
 <section id="pack" hidden>
@@ -376,13 +376,17 @@ async function loadWeather(){
 setInterval(()=>{if(!document.hidden)renderList()},60000);
 function setSync(){if(db)$('sync').textContent=navigator.onLine?'👫 ふたりで共有中':'📴 オフライン（つながると自動で同期）'}
 addEventListener('online',setSync);addEventListener('offline',setSync);
+let wishEditId=null;
 function renderWish(){
-  const L=[...S.wish].sort((a,b)=>(a.at||0)-(b.at||0));
+  $('wishDay').innerHTML=Array.from({length:S.days},(_,i)=>`<option value="${i}">${i+1}日目 ${dayLabel(i)}</option>`).join('');
+  const L=[...S.wish].sort((a,b)=>(a.day??999)-(b.day??999)||(a.at||0)-(b.at||0));
   $('wishList').innerHTML=L.length?L.map(w=>`
   <div class="item">
     <div class="body">
+      <div class="sub" style="margin-bottom:3px">${w.day===undefined?'日程未設定':`${w.day+1}日目${dayLabel(w.day)?' · '+dayLabel(w.day):''}`}</div>
       <div class="t">${esc(w.title)}</div>
       ${w.place?`<div class="sub"><a class="map" target="_blank" rel="noopener" href="https://maps.apple.com/?q=${encodeURIComponent(w.place)}">📍 ${esc(w.place)}</a></div>`:''}
+      <button class="mini" data-we="${w.id}" style="margin-top:8px">✏️ 編集</button>
       <button class="mini" data-wm="${w.id}" style="margin-top:8px;color:var(--ac);font-weight:700">予定に入れる</button>
     </div>
     <button class="del" data-wx="${w.id}" aria-label="削除">×</button>
@@ -423,13 +427,15 @@ $('f').onsubmit=e=>{
   let it;if(editId){it=S.items.find(i=>i.id===editId);Object.assign(it,v)}else{it={id:uid(),day:cur,done:false,...v};S.items.push(it)}
   cur=it.day;renderDays();putItem(it);renderList();renderCost();
 };
-$('wishForm').onsubmit=e=>{e.preventDefault();const t=$('wishT').value.trim();if(!t)return;const w={id:uid(),title:t,place:$('wishP').value.trim(),at:Date.now()};S.wish.push(w);$('wishT').value='';$('wishP').value='';putWish(w);renderWish()};
+$('wishForm').onsubmit=e=>{e.preventDefault();const t=$('wishT').value.trim();if(!t)return;let w;if(wishEditId){w=S.wish.find(i=>i.id===wishEditId);if(!w)return;Object.assign(w,{title:t,place:$('wishP').value.trim(),day:+$('wishDay').value});}else{w={id:uid(),title:t,place:$('wishP').value.trim(),day:+$('wishDay').value,at:Date.now()};S.wish.push(w)}putWish(w);wishEditId=null;$('wishT').value='';$('wishP').value='';$('wishSubmit').textContent='候補を追加';$('wishCancel').hidden=true;renderWish()};
+$('wishCancel').onclick=()=>{wishEditId=null;$('wishT').value='';$('wishP').value='';$('wishSubmit').textContent='候補を追加';$('wishCancel').hidden=true};
 let moveId=null;
 $('wishList').onclick=e=>{
   if(e.target.closest('a.map'))return;
-  const m=e.target.closest('[data-wm]'),x=e.target.closest('[data-wx]');
-  if(m){moveId=m.dataset.wm;const w=S.wish.find(i=>i.id===moveId);$('mh').textContent='「'+w.title+'」を予定に入れる';
-    $('mday').innerHTML=Array.from({length:S.days},(_,i)=>`<option value="${i}">${i+1}日目 ${dayLabel(i)}</option>`).join('');$('mday').value=cur;$('mtime').value='';$('dlgM').showModal();if(document.activeElement&&document.activeElement!==$('dlgM'))document.activeElement.blur()}
+  const ed=e.target.closest('[data-we]'),m=e.target.closest('[data-wm]'),x=e.target.closest('[data-wx]');
+  if(ed){const w=S.wish.find(i=>i.id===ed.dataset.we);if(!w)return;wishEditId=w.id;$('wishT').value=w.title;$('wishP').value=w.place||'';$('wishDay').value=String(w.day??0);$('wishSubmit').textContent='変更を保存';$('wishCancel').hidden=false;$('wishT').focus()}
+  else if(m){moveId=m.dataset.wm;const w=S.wish.find(i=>i.id===moveId);$('mh').textContent='「'+w.title+'」を予定に入れる';
+    $('mday').innerHTML=Array.from({length:S.days},(_,i)=>`<option value="${i}">${i+1}日目 ${dayLabel(i)}</option>`).join('');$('mday').value=String(w.day??cur);$('mtime').value='';$('dlgM').showModal();if(document.activeElement&&document.activeElement!==$('dlgM'))document.activeElement.blur()}
   else if(x){if(confirm('この候補を削除しますか？')){rmWish(x.dataset.wx);S.wish=S.wish.filter(i=>i.id!==x.dataset.wx);renderWish()}}
 };
 $('mcancel').onclick=()=>$('dlgM').close();
