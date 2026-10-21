@@ -44,7 +44,7 @@ dialog{border:0;border-radius:20px;background:var(--card);color:var(--ink);width
 dialog::backdrop{background:rgba(0,0,0,.45)}
 dialog h2{margin:0 0 10px;font-size:18px}
 label{display:block;font-size:13px;color:var(--sub);margin-top:10px}
-dialog input,dialog textarea{width:100%;border:1px solid var(--line);background:var(--bg);border-radius:10px;padding:10px;font-size:16px}
+dialog input,dialog textarea,dialog select{width:100%;border:1px solid var(--line);background:var(--bg);border-radius:10px;padding:10px;font-size:16px}
 .row{display:flex;gap:10px}.row>*{flex:1}
 .acts{display:flex;gap:10px;margin-top:16px}
 .acts button{flex:1;border-radius:12px;padding:12px;border:1px solid var(--line);background:none;font-weight:700;cursor:pointer}
@@ -96,6 +96,7 @@ dialog input,dialog textarea{width:100%;border:1px solid var(--line);background:
       <div><label for="ftime">時間</label><input type="time" id="ftime"></div>
       <div><label for="fcost">費用（円）</label><input type="number" id="fcost" inputmode="numeric" min="0" placeholder="0"></div>
     </div>
+    <label for="fpay">支払った人（精算に使います）</label><select id="fpay"><option value="">未設定（精算に含めない）</option><option value="0" id="o0"></option><option value="1" id="o1"></option></select>
     <label for="ftitle">やること</label><input id="ftitle" required maxlength="60" placeholder="例：清水寺を散歩">
     <label for="fplace">場所</label><input id="fplace" maxlength="80" placeholder="例：京都市東山区">
     <label for="fnote">メモ</label><textarea id="fnote" rows="2" maxlength="200" placeholder="予約番号、持っていくものなど"></textarea>
@@ -120,13 +121,13 @@ const shim={
   collection:c=>{const cr=collection(fs,'trips',TID,c);return{doc:id=>{const r=doc(fs,'trips',TID,c,id);return{set:d=>setDoc(r,d),delete:()=>deleteDoc(r)}},onSnapshot:n=>onSnapshot(cr,q=>n({docs:q.docs.map(d=>({data:()=>d.data()}))}),bad)}}
 };
 const KEY='futari-trip-v1';
-let S={title:'ふたりの旅',start:'',days:3,items:[],pack:[]};
+let S={title:'ふたりの旅',start:'',days:3,names:['自分','彼女'],items:[],pack:[]};
 try{const r=localStorage.getItem(KEY);if(r)S=Object.assign(S,JSON.parse(r))}catch(e){}
 let cur=0,editId=null;
 const $=id=>document.getElementById(id);
 const save=()=>{try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}};
 let db=null,mt;const ig=()=>{};
-const syncMeta=()=>{if(!db)return save();clearTimeout(mt);mt=setTimeout(()=>db.doc('trip/meta').set({title:S.title,start:S.start,days:S.days}).catch(ig),400)};
+const syncMeta=()=>{if(!db)return save();clearTimeout(mt);mt=setTimeout(()=>db.doc('trip/meta').set({title:S.title,start:S.start,days:S.days,names:S.names}).catch(ig),400)};
 const putItem=it=>{if(!db)return save();db.collection('items').doc(it.id).set(it).catch(ig)};
 const rmItem=id=>{if(!db)return save();db.collection('items').doc(id).delete().catch(ig)};
 const putPack=p=>{if(!db)return save();db.collection('pack').doc(p.id).set(p).catch(ig)};
@@ -159,7 +160,7 @@ function renderList(){
       <div class="t">${esc(x.title)}</div>
       ${x.place?`<div class="sub"><a class="map" target="_blank" rel="noopener" href="https://maps.apple.com/?q=${encodeURIComponent(x.place)}">📍 ${esc(x.place)}</a></div>`:''}
       ${x.note?`<div class="sub">${esc(x.note)}</div>`:''}
-      ${x.cost?`<span class="cost">${yen(x.cost)}</span>`:''}
+      ${x.cost?`<span class="cost">${yen(x.cost)}${x.pay==='0'||x.pay==='1'?'（'+esc(S.names[+x.pay])+'）':''}</span>`:''}
     </div>
     <button class="del" data-x="${x.id}" aria-label="削除">×</button>
   </div>`).join(''):`<div class="empty">この日の予定はまだありません。<br>「＋ 予定を追加」から入れてみましょう。</div>`;
@@ -173,10 +174,21 @@ function renderPack(){
   </div>`).join(''):`<div class="empty">持ち物リストは空です。<br>充電器やパスポートなど、忘れ物防止に。</div>`;
 }
 function renderCost(){
-  const tot=S.items.reduce((a,x)=>a+(+x.cost||0),0);
-  const per=Array.from({length:S.days},(_,i)=>S.items.filter(x=>x.day===i).reduce((a,x)=>a+(+x.cost||0),0));
+  const N=S.names,c=x=>+x.cost||0;
+  const tot=S.items.reduce((a,x)=>a+c(x),0);
+  const per=Array.from({length:S.days},(_,i)=>S.items.filter(x=>x.day===i).reduce((a,x)=>a+c(x),0));
+  const paid=[0,0];let asg=0,unset=0;
+  S.items.forEach(x=>{if(x.pay==='0'||x.pay==='1'){paid[+x.pay]+=c(x);asg+=c(x)}else unset+=c(x)});
+  const diff=paid[0]-asg/2;
+  const res=asg===0?'「支払った人」を入れると、精算額が出ます':Math.abs(diff)<1?'精算なし（ちょうど折半です）':`${esc(diff>0?N[1]:N[0])} → ${esc(diff>0?N[0]:N[1])} に <b>${yen(Math.abs(diff))}</b>`;
   $('cost').innerHTML=`<div class="sum"><div class="sub">合計</div><div class="big">${yen(tot)}</div>
   <div class="sub">ひとりあたり ${yen(tot/2)}</div></div>
+  <div class="sum"><div style="font-weight:700;margin-bottom:4px">精算（折半）</div>
+  <div class="big" style="font-size:20px;margin:6px 0">${res}</div>
+  <div class="line"><span>${esc(N[0])}が払った</span><span>${yen(paid[0])}</span></div>
+  <div class="line"><span>${esc(N[1])}が払った</span><span>${yen(paid[1])}</span></div>
+  ${unset>0?`<div class="line"><span>支払った人が未設定</span><span>${yen(unset)}</span></div>`:''}
+  <div class="meta" style="margin-top:10px"><label style="margin:0">名前 <input data-n="0" value="${esc(N[0])}" maxlength="10" style="width:90px"></label><label style="margin:0"><input data-n="1" value="${esc(N[1])}" maxlength="10" style="width:90px"></label></div></div>
   <div class="sum"><div style="font-weight:700;margin-bottom:4px">日ごとの費用</div>${per.map((v,i)=>`<div class="line"><span>${i+1}日目 ${dayLabel(i)}</span><span>${yen(v)}</span></div>`).join('')}</div>`;
 }
 function all(){head();renderDays();renderList();renderPack();renderCost()}
@@ -200,13 +212,13 @@ $('list').onclick=e=>{
 function openDlg(id){
   editId=id||null;const it=id?S.items.find(i=>i.id===id):{};
   $('dh').textContent=id?'予定を編集':`${cur+1}日目の予定を追加`;
-  $('ftime').value=it.time||'';$('fcost').value=it.cost||'';$('ftitle').value=it.title||'';$('fplace').value=it.place||'';$('fnote').value=it.note||'';
+  $('ftime').value=it.time||'';$('fcost').value=it.cost||'';$('ftitle').value=it.title||'';$('fplace').value=it.place||'';$('fnote').value=it.note||'';$('o0').textContent=S.names[0];$('o1').textContent=S.names[1];$('fpay').value=it.pay||'';
   $('dlg').showModal();
 }
 $('fab').onclick=()=>openDlg();
 $('cancel').onclick=()=>$('dlg').close();
 $('f').onsubmit=e=>{
-  const v={time:$('ftime').value,cost:+$('fcost').value||0,title:$('ftitle').value.trim(),place:$('fplace').value.trim(),note:$('fnote').value.trim()};
+  const v={time:$('ftime').value,cost:+$('fcost').value||0,title:$('ftitle').value.trim(),place:$('fplace').value.trim(),note:$('fnote').value.trim(),pay:$('fpay').value};
   if(!v.title)return;
   let it;if(editId){it=S.items.find(i=>i.id===editId);Object.assign(it,v)}else{it={id:uid(),day:cur,done:false,...v};S.items.push(it)}
   putItem(it);renderList();renderCost();
@@ -217,6 +229,7 @@ $('packList').onclick=e=>{
   if(c){const p=S.pack.find(p=>p.id===c.dataset.pc);p.done=c.checked;putPack(p);renderPack()}
   else if(x){rmPack(x.dataset.px);S.pack=S.pack.filter(p=>p.id!==x.dataset.px);renderPack()}
 };
+$('cost').onchange=e=>{const i=e.target.dataset.n;if(i===undefined)return;S.names[+i]=e.target.value.trim()||(i==='0'?'自分':'彼女');syncMeta();renderCost();renderList()};
 $('cp').onclick=async()=>{try{await navigator.clipboard.writeText(location.href);$('cp').textContent='コピーしました'}catch(e){prompt('このリンクを彼女に送ってください',location.href)}};
 $('sw').onclick=()=>{const v=prompt('彼女から届いたリンクかコードを貼り付けてください');if(!v)return;const m=v.trim().match(/([A-Za-z0-9_-]{12,40})$/);if(!m)return alert('コードが正しくありません');try{localStorage.setItem(TK,m[1])}catch(e){}location.hash='t='+m[1];location.reload()};
 all();
@@ -224,8 +237,8 @@ all();
   db=shim;
   $('sync').textContent='👫 ふたりで共有中';
   db.doc('trip/meta').onSnapshot(s=>{
-    if(s.exists){const d=s.data();S.title=d.title??S.title;S.start=d.start||'';S.days=d.days||S.days;if(cur>=S.days)cur=S.days-1;all()}
-    else{db.doc('trip/meta').set({title:S.title,start:S.start,days:S.days}).catch(ig);
+    if(s.exists){const d=s.data();S.title=d.title??S.title;S.start=d.start||'';S.days=d.days||S.days;if(d.names)S.names=d.names;if(cur>=S.days)cur=S.days-1;all()}
+    else{db.doc('trip/meta').set({title:S.title,start:S.start,days:S.days,names:S.names}).catch(ig);
       S.items.forEach(it=>db.collection('items').doc(it.id).set(it).catch(ig));S.pack.forEach(p=>db.collection('pack').doc(p.id).set(p).catch(ig))}
   },ig);
   db.collection('items').onSnapshot(q=>{S.items=q.docs.map(d=>d.data());renderList();renderCost()},ig);
