@@ -36,6 +36,7 @@ nav.tabs button[aria-selected=true]{background:var(--ac);color:var(--acink)}
 .cost{display:inline-block;background:color-mix(in srgb,var(--sun) 30%,transparent);border-radius:8px;padding:0 8px;font-size:13px;margin-top:4px}
 .chk{width:24px;height:24px;accent-color:var(--ac);margin-top:2px;flex:0 0 auto}
 .del{border:0;background:none;color:var(--sub);font-size:20px;line-height:1;padding:2px 6px;cursor:pointer}
+.mini{border:1px solid var(--line);background:var(--card);border-radius:10px;padding:4px 10px;font-size:13px;cursor:pointer}
 .empty{text-align:center;color:var(--sub);padding:36px 12px;border:2px dashed var(--line);border-radius:16px}
 .fab{position:fixed;right:max(16px,calc(50% - 264px));bottom:calc(20px + env(safe-area-inset-bottom,0px));background:var(--ac);color:var(--acink);border:0;border-radius:28px;padding:14px 22px;font-weight:700;box-shadow:0 6px 18px rgba(0,0,0,.22);cursor:pointer}
 dialog{border:0;border-radius:20px;background:var(--card);color:var(--ink);width:calc(100% - 24px);max-width:520px;padding:18px;margin:auto auto 12px}
@@ -66,7 +67,7 @@ dialog input,dialog textarea{width:100%;border:1px solid var(--line);background:
     <label style="margin:0">日数 <input type="number" id="ndays" min="1" max="30"></label>
     <span class="count" id="countdown"></span>
   </div>
-  <div class="sub" id="sync" style="margin-top:6px">📱 この端末のみ保存</div>
+  <div class="sub" style="margin-top:8px;display:flex;gap:8px;align-items:center;flex-wrap:wrap"><span id="sync">📱 この端末のみ保存</span><button id="cp" class="mini">リンクをコピー</button><button id="sw" class="mini">コード入力</button></div>
 </header>
 <nav class="tabs" role="tablist">
   <button role="tab" data-tab="plan" aria-selected="true">予定</button>
@@ -101,7 +102,22 @@ dialog input,dialog textarea{width:100%;border:1px solid var(--line);background:
   </form>
 </dialog>
 
-<script>
+<script type="module">
+import {initializeApp} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+import {getFirestore,doc,setDoc,deleteDoc,collection,onSnapshot} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+const firebaseConfig={apiKey:"AIzaSyDbAuDZZAUCJ69Rqht_tokUao-yMaz2Rhw",authDomain:"trip-c496b.firebaseapp.com",projectId:"trip-c496b",storageBucket:"trip-c496b.firebasestorage.app",messagingSenderId:"376434234702",appId:"1:376434234702:web:879a29f655314c043efa1f"};
+const app=initializeApp(firebaseConfig),fs=getFirestore(app);
+const TK='futari-trip-id';
+let TID=(location.hash.match(/^#t=([A-Za-z0-9_-]{12,40})$/)||[])[1];
+try{if(!TID)TID=localStorage.getItem(TK)}catch(e){}
+if(!TID)TID=Array.from(crypto.getRandomValues(new Uint8Array(20)),b=>'abcdefghijkmnpqrstuvwxyz23456789'[b%32]).join('');
+try{localStorage.setItem(TK,TID)}catch(e){}
+history.replaceState(null,'','#t='+TID);
+const bad=()=>{document.getElementById('sync').textContent='⚠ 同期エラー（ルールを確認）'};
+const shim={
+  doc:()=>{const r=doc(fs,'trips',TID,'meta','main');return{set:d=>setDoc(r,d),onSnapshot:(n)=>onSnapshot(r,x=>n({exists:x.exists(),data:()=>x.data()}),bad)}},
+  collection:c=>{const cr=collection(fs,'trips',TID,c);return{doc:id=>{const r=doc(fs,'trips',TID,c,id);return{set:d=>setDoc(r,d),delete:()=>deleteDoc(r)}},onSnapshot:n=>onSnapshot(cr,q=>n({docs:q.docs.map(d=>({data:()=>d.data()}))}),bad)}}
+};
 const KEY='futari-trip-v1';
 let S={title:'ふたりの旅',start:'',days:3,items:[],pack:[]};
 try{const r=localStorage.getItem(KEY);if(r)S=Object.assign(S,JSON.parse(r))}catch(e){}
@@ -199,9 +215,11 @@ $('packList').onclick=e=>{
   if(c){const p=S.pack.find(p=>p.id===c.dataset.pc);p.done=c.checked;putPack(p);renderPack()}
   else if(x){rmPack(x.dataset.px);S.pack=S.pack.filter(p=>p.id!==x.dataset.px);renderPack()}
 };
+$('cp').onclick=async()=>{try{await navigator.clipboard.writeText(location.href);$('cp').textContent='コピーしました'}catch(e){prompt('このリンクを彼女に送ってください',location.href)}};
+$('sw').onclick=()=>{const v=prompt('彼女から届いたリンクかコードを貼り付けてください');if(!v)return;const m=v.trim().match(/([A-Za-z0-9_-]{12,40})$/);if(!m)return alert('コードが正しくありません');try{localStorage.setItem(TK,m[1])}catch(e){}location.hash='t='+m[1];location.reload()};
 all();
 (async()=>{try{
-  const c=window.claude&&await claude.use('db');if(!c)return;db=c;
+  db=shim;
   $('sync').textContent='👫 ふたりで共有中';
   db.doc('trip/meta').onSnapshot(s=>{
     if(s.exists){const d=s.data();S.title=d.title??S.title;S.start=d.start||'';S.days=d.days||S.days;if(cur>=S.days)cur=S.days-1;all()}
