@@ -4,59 +4,70 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>ふたり旅プランナー</title>
+<meta name="theme-color" content="#eef4fb">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Shippori+Mincho+B1:wght@700;800&family=Zen+Kaku+Gothic+New:wght@400;700&display=swap" rel="stylesheet">
 <style>
-:root{--bg:#eef3f4;--card:#fff;--ink:#1d2b33;--sub:#6b7c85;--line:#d9e3e6;--ac:#1f7a6b;--acink:#fff;--sun:#f2b84b;--danger:#c4483d;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
-@media(prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#121b20;--card:#1b272e;--ink:#e8f0f2;--sub:#8fa3ad;--line:#2b3b44;--ac:#4cc2ae;--acink:#0d1a17;--sun:#f2b84b;--danger:#ef7a6f}}
+:root{--bg:#eef4fb;--card:#ffffff;--card2:#f4f7fc;--ink:#14213d;--sub:#5b6b8a;--line:#d6e0ee;--ac:#d9442e;--acink:#fff;--sun:#f7b23b;--link:#b34a12;color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
 *{box-sizing:border-box}
 html{scroll-padding-top:env(safe-area-inset-top,0px)}
-body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.55 "Zen Maru Gothic","Hiragino Maru Gothic ProN","Hiragino Sans","Noto Sans JP",sans-serif;-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.6 "Zen Kaku Gothic New","Hiragino Sans","Noto Sans JP",sans-serif;-webkit-text-size-adjust:100%}
 main{max-width:560px;margin:0 auto;padding:16px 16px 120px}
-button,input,textarea{font:inherit;color:inherit}
+button,input,textarea,select{font:inherit;color:inherit}
 header{padding:8px 0 12px}
-#title{width:100%;border:0;background:transparent;font-size:26px;font-weight:700;padding:4px 0;border-bottom:2px dashed var(--line)}
-#title:focus{outline:none;border-color:var(--ac)}
-.meta{display:flex;gap:10px;margin-top:10px;align-items:center;color:var(--sub);font-size:14px;flex-wrap:wrap}
+#title{width:100%;border:0;background:transparent;font:800 30px/1.3 "Shippori Mincho B1","Hiragino Mincho ProN",serif;padding:4px 0;border-bottom:2px dashed var(--line);letter-spacing:.02em}
+#title:focus{outline:none;border-color:var(--sun)}
+.meta{display:flex;gap:10px;margin-top:12px;align-items:center;color:var(--sub);font-size:14px;flex-wrap:wrap}
 .meta input{border:1px solid var(--line);background:var(--card);border-radius:10px;padding:6px 10px;font-size:15px}
 .meta input[type=number]{width:64px}
-.count{margin-left:auto;font-weight:700;color:var(--ac)}
-nav.tabs{display:flex;background:var(--card);border-radius:14px;padding:4px;margin:8px 0 14px;border:1px solid var(--line)}
+.count{margin-left:auto;background:var(--ac);color:var(--acink);border-radius:999px;padding:3px 14px;font-weight:700;font-size:14px}
+.count:empty{display:none}
+.count b{font-size:22px;font-variant-numeric:tabular-nums;margin:0 2px}
+nav.tabs{display:flex;background:var(--card);border-radius:14px;padding:4px;margin:10px 0 16px;border:1px solid var(--line)}
 nav.tabs button{flex:1;border:0;background:none;padding:9px 0;border-radius:10px;font-weight:700;color:var(--sub);cursor:pointer}
 nav.tabs button[aria-selected=true]{background:var(--ac);color:var(--acink)}
 .days{display:flex;gap:8px;overflow-x:auto;padding-bottom:8px;margin-bottom:6px}
-.days button{flex:0 0 auto;border:1px solid var(--line);background:var(--card);border-radius:14px;padding:6px 14px;text-align:center;cursor:pointer;line-height:1.3}
-.days button small{display:block;color:var(--sub);font-size:12px}
-.days button[aria-pressed=true]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
-.days button[aria-pressed=true] small{color:var(--bg);opacity:.75}
-.item{display:flex;gap:12px;background:var(--card);border:1px solid var(--line);border-radius:16px;padding:12px 14px;margin-bottom:10px;align-items:flex-start}
+.days button{flex:0 0 auto;border:1px solid var(--line);background:var(--card);border-radius:12px;padding:6px 14px;text-align:center;cursor:pointer;line-height:1.35;font-weight:700}
+.days button small{display:block;color:var(--sub);font-size:12px;font-weight:400}
+.days button[aria-pressed=true]{background:var(--sun);color:#1a1204;border-color:var(--sun)}
+.days button[aria-pressed=true] small{color:#3a2a0c}
+.tk{position:relative;display:flex;background:var(--card);border:1px solid var(--line);border-radius:14px;margin-bottom:14px}
+.tk::before,.tk::after{content:"";position:absolute;left:68px;width:16px;height:16px;border-radius:50%;background:var(--bg);z-index:1}
+.tk::before{top:-8px}.tk::after{bottom:-8px}
+.tk{box-shadow:0 1px 3px rgba(20,33,61,.08)}
+.stub{flex:0 0 76px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;padding:12px 4px;border-right:2px dashed var(--line);background:color-mix(in srgb,var(--cc) 20%,#fff);border-radius:13px 0 0 13px}
+.stub .ic{font-size:26px;line-height:1}
+.stub .tm{font-weight:700;font-size:15px;font-variant-numeric:tabular-nums}
+.tk .body{flex:1;min-width:0;padding:12px 8px 12px 14px;cursor:pointer}
+.tk .side{display:flex;flex-direction:column;align-items:center;justify-content:space-between;padding:12px 8px 6px 0}
+.tk.done{opacity:.5}.tk.done .t{text-decoration:line-through}
+.item{display:flex;gap:12px;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:12px 14px;margin-bottom:10px;align-items:flex-start}
 .item.done{opacity:.5}.item.done .t{text-decoration:line-through}
-.time{min-width:48px;font-weight:700;color:var(--ac);font-variant-numeric:tabular-nums;padding-top:1px}
 .body{flex:1;min-width:0}
-.t{font-weight:700;overflow-wrap:anywhere}
+.t{font-weight:700;font-size:17px;overflow-wrap:anywhere}
 .sub{color:var(--sub);font-size:14px;overflow-wrap:anywhere}
-.cost{display:inline-block;background:color-mix(in srgb,var(--sun) 30%,transparent);border-radius:8px;padding:0 8px;font-size:13px;margin-top:4px}
-.chk{width:24px;height:24px;accent-color:var(--ac);margin-top:2px;flex:0 0 auto}
+.cost{display:inline-block;background:color-mix(in srgb,var(--sun) 24%,transparent);border-radius:8px;padding:0 8px;font-size:13px;margin-top:6px}
+.chk{width:24px;height:24px;accent-color:var(--ac);flex:0 0 auto}
 .del{border:0;background:none;color:var(--sub);font-size:20px;line-height:1;padding:2px 6px;cursor:pointer}
 .add select{border:1px solid var(--line);background:var(--card);border-radius:12px;padding:0 8px;font-size:15px}
-.mini{border:1px solid var(--line);background:var(--card);border-radius:10px;padding:4px 10px;font-size:13px;cursor:pointer}
-.map{color:var(--ac);text-decoration:underline;text-underline-offset:3px}
-.empty{text-align:center;color:var(--sub);padding:36px 12px;border:2px dashed var(--line);border-radius:16px}
-.fab{position:fixed;right:max(16px,calc(50% - 264px));bottom:calc(20px + env(safe-area-inset-bottom,0px));background:var(--ac);color:var(--acink);border:0;border-radius:28px;padding:14px 22px;font-weight:700;box-shadow:0 6px 18px rgba(0,0,0,.22);cursor:pointer}
-dialog{border:0;border-radius:20px;background:var(--card);color:var(--ink);width:calc(100% - 24px);max-width:520px;padding:18px;margin:auto auto 12px}
-dialog::backdrop{background:rgba(0,0,0,.45)}
-dialog h2{margin:0 0 10px;font-size:18px}
+.mini{border:1px solid var(--line);background:var(--card2);border-radius:10px;padding:4px 10px;font-size:13px;cursor:pointer}
+.map{color:var(--link);text-decoration:underline;text-underline-offset:3px}
+.empty{text-align:center;color:var(--sub);padding:36px 12px;border:2px dashed var(--line);border-radius:14px}
+.fab{position:fixed;right:max(16px,calc(50% - 264px));bottom:calc(20px + env(safe-area-inset-bottom,0px));background:var(--ac);color:var(--acink);border:0;border-radius:28px;padding:14px 22px;font-weight:700;box-shadow:0 6px 16px rgba(217,68,46,.35);cursor:pointer}
+dialog{border:0;border-radius:20px;background:var(--card);color:var(--ink);width:calc(100% - 24px);max-width:520px;max-height:calc(100% - 24px);overflow:auto;padding:18px;margin:auto auto 12px}
+dialog::backdrop{background:rgba(20,33,61,.45)}
+dialog h2{margin:0 0 10px;font:800 19px "Shippori Mincho B1","Hiragino Mincho ProN",serif}
 label{display:block;font-size:13px;color:var(--sub);margin-top:10px}
 dialog input,dialog textarea,dialog select{width:100%;border:1px solid var(--line);background:var(--bg);border-radius:10px;padding:10px;font-size:16px}
 .row{display:flex;gap:10px}.row>*{flex:1;min-width:0}
 dialog input:not([type=checkbox]),dialog select{height:46px;min-width:0}
-dialog input[type=time]{-webkit-appearance:none;appearance:none}
-dialog input[type=time]{text-align:left;display:block}
+dialog input[type=time]{-webkit-appearance:none;appearance:none;text-align:left;display:block}
 dialog input[type=time]::-webkit-date-and-time-value{text-align:left}
 dialog:focus{outline:none}
-dialog select{width:100%;border:1px solid var(--line);background:var(--bg);border-radius:10px;padding:10px;font-size:16px}
 .acts{display:flex;gap:10px;margin-top:16px}
 .acts button{flex:1;border-radius:12px;padding:12px;border:1px solid var(--line);background:none;font-weight:700;cursor:pointer}
 .acts .pri{background:var(--ac);color:var(--acink);border-color:var(--ac)}
-.sum{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:16px;margin-bottom:12px}
+.sum{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px;margin-bottom:12px}
 .big{font-size:30px;font-weight:700}
 .line{display:flex;justify-content:space-between;padding:6px 0;border-top:1px solid var(--line);font-size:15px}
 .add{display:flex;gap:8px;margin-bottom:12px}
@@ -121,6 +132,7 @@ dialog select{width:100%;border:1px solid var(--line);background:var(--bg);borde
       <div><label for="ftime">時間</label><input type="time" id="ftime"></div>
       <div><label for="fcost">費用（円）</label><input type="number" id="fcost" inputmode="numeric" min="0" placeholder="0"></div>
     </div>
+    <label for="fcat">種類</label><select id="fcat"><option value="">おまかせ（自動）</option><option value="move">✈️ 移動</option><option value="food">🍜 食事</option><option value="sight">⛩️ 観光</option><option value="stay">🏨 宿泊</option><option value="other">📌 その他</option></select>
     <label for="fpay">支払った人（精算に使います）</label><select id="fpay"><option value="">未設定（精算に含めない）</option><option value="0" id="o0"></option><option value="1" id="o1"></option></select>
     <label for="ftitle">やること</label><input id="ftitle" required maxlength="60" placeholder="例：清水寺を散歩">
     <label for="fplace">場所</label><input id="fplace" maxlength="80" placeholder="例：京都市東山区">
@@ -171,27 +183,33 @@ function head(){
   if(document.activeElement!==$('title'))$('title').value=S.title;$('start').value=S.start;$('ndays').value=S.days;
   const c=$('countdown');
   if(S.start){const t=new Date();t.setHours(0,0,0,0);const n=Math.round((new Date(S.start+'T00:00:00')-t)/864e5);
-    c.textContent=n>0?`出発まで${n}日`:n===0?'今日出発！':'旅行中・おかえり';}else c.textContent='';
+    c.innerHTML=n>0?`🏮 出発まで<b>${n}</b>日`:n===0?'🏮 今日出発！':'🏮 旅行中';}else c.textContent='';
 }
 function renderDays(){
   $('days').innerHTML=Array.from({length:S.days},(_,i)=>
     `<button aria-pressed="${i===cur}" data-d="${i}">${i+1}日目<small>${dayLabel(i)?dayLabel(i)+'（'+dayWk(i)+'）':'&nbsp;'}</small></button>`).join('');
 }
+const CATS={move:['✈️','#5aa9e6'],food:['🍜','#f4a43a'],sight:['⛩️','#e4513a'],stay:['🏨','#9b8cf0'],other:['📌','#8a98b3']};
+function guess(x){const t=(x.title||'')+(x.place||'');
+  if(/飛行機|空港|フライト|電車|新幹線|バス|タクシー|移動|駅|到着|レンタカー|フェリー|地下鉄/.test(t))return'move';
+  if(/ランチ|ディナー|朝食|昼食|夕食|カフェ|ラーメン|食|寿司|居酒屋|屋台|もつ鍋|レストラン|喫茶|バー|うどん/.test(t))return'food';
+  if(/ホテル|宿|チェックイン|チェックアウト|旅館|民宿/.test(t))return'stay';
+  if(/観光|神社|寺|城|公園|美術館|博物館|水族館|動物園|散策|散歩|温泉|展望|ショッピング|買い物|イルミ|タワー/.test(t))return'sight';
+  return'other'}
 function renderList(){
   const L=S.items.filter(x=>x.day===cur).sort((a,b)=>(a.time||'99:99').localeCompare(b.time||'99:99'));
-  $('list').innerHTML=L.length?L.map(x=>`
-  <div class="item ${x.done?'done':''}">
-    <input type="checkbox" class="chk" data-c="${x.id}" ${x.done?'checked':''} aria-label="完了">
-    <div class="time">${x.time||'--:--'}</div>
-    <div class="body" data-e="${x.id}" style="cursor:pointer">
+  $('list').innerHTML=L.length?L.map(x=>{const k=CATS[x.cat]?x.cat:guess(x),[ic,cc]=CATS[k];return `
+  <div class="tk ${x.done?'done':''}" style="--cc:${cc}">
+    <div class="stub"><div class="ic">${ic}</div><div class="tm">${x.time||'--:--'}</div></div>
+    <div class="body" data-e="${x.id}">
       <div class="t">${esc(x.title)}</div>
       ${x.place?`<div class="sub"><a class="map" target="_blank" rel="noopener" href="https://maps.apple.com/?q=${encodeURIComponent(x.place)}">📍 ${esc(x.place)}</a></div>`:''}
       ${x.note?`<div class="sub">${esc(x.note)}</div>`:''}
-      <div><button class="mini" data-ca="${x.id}" style="margin-top:6px">📅 カレンダーに追加</button></div>
       ${x.cost?`<span class="cost">${yen(x.cost)}${x.pay==='0'||x.pay==='1'?'（'+esc(S.names[+x.pay])+'）':''}</span>`:''}
+      <div><button class="mini" data-ca="${x.id}" style="margin-top:8px">📅 カレンダーに追加</button></div>
     </div>
-    <button class="del" data-x="${x.id}" aria-label="削除">×</button>
-  </div>`).join(''):`<div class="empty">この日の予定はまだありません。<br>「＋ 予定を追加」から入れてみましょう。</div>`;
+    <div class="side"><input type="checkbox" class="chk" data-c="${x.id}" ${x.done?'checked':''} aria-label="完了"><button class="del" data-x="${x.id}" aria-label="削除">×</button></div>
+  </div>`}).join(''):`<div class="empty">この日の予定はまだありません。<br>「＋ 予定を追加」から入れてみましょう。</div>`;
 }
 let packF='all';
 function renderPack(){
@@ -292,13 +310,13 @@ $('list').onclick=e=>{
 function openDlg(id){
   editId=id||null;const it=id?S.items.find(i=>i.id===id):{};
   $('dh').textContent=id?'予定を編集':`${cur+1}日目の予定を追加`;
-  $('ftime').value=it.time||'';$('fcost').value=it.cost||'';$('ftitle').value=it.title||'';$('fplace').value=it.place||'';$('fnote').value=it.note||'';$('o0').textContent=S.names[0];$('o1').textContent=S.names[1];$('fpay').value=it.pay||'';
+  $('ftime').value=it.time||'';$('fcost').value=it.cost||'';$('ftitle').value=it.title||'';$('fplace').value=it.place||'';$('fnote').value=it.note||'';$('o0').textContent=S.names[0];$('o1').textContent=S.names[1];$('fpay').value=it.pay||'';$('fcat').value=it.cat||'';
   $('dlg').showModal();if(document.activeElement&&document.activeElement!==$('dlg'))document.activeElement.blur();
 }
 $('fab').onclick=()=>openDlg();
 $('cancel').onclick=()=>$('dlg').close();
 $('f').onsubmit=e=>{
-  const v={time:$('ftime').value,cost:+$('fcost').value||0,title:$('ftitle').value.trim(),place:$('fplace').value.trim(),note:$('fnote').value.trim(),pay:$('fpay').value};
+  const v={time:$('ftime').value,cost:+$('fcost').value||0,title:$('ftitle').value.trim(),place:$('fplace').value.trim(),note:$('fnote').value.trim(),pay:$('fpay').value,cat:$('fcat').value};
   if(!v.title)return;
   let it;if(editId){it=S.items.find(i=>i.id===editId);Object.assign(it,v)}else{it={id:uid(),day:cur,done:false,...v};S.items.push(it)}
   putItem(it);renderList();renderCost();
