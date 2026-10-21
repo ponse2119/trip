@@ -70,9 +70,12 @@ dialog:focus{outline:none}
 .sum{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px;margin-bottom:12px}
 .big{font-size:30px;font-weight:700}
 .line{display:flex;justify-content:space-between;padding:6px 0;border-top:1px solid var(--line);font-size:15px}
-.add{display:flex;gap:8px;margin-bottom:12px}
-.add input{flex:1;border:1px solid var(--line);background:var(--card);border-radius:12px;padding:10px;font-size:16px}
-.add button{border:0;background:var(--ac);color:var(--acink);border-radius:12px;padding:0 18px;font-weight:700;cursor:pointer}
+ .add{display:flex;gap:8px;margin-bottom:12px;min-width:0;max-width:100%}
+.add input{flex:1 1 0%;min-width:0;width:0;border:1px solid var(--line);background:var(--card);border-radius:12px;padding:10px;font-size:16px}
+.add button{flex:0 0 auto;border:0;background:var(--ac);color:var(--acink);border-radius:12px;padding:0 14px;font-weight:700;cursor:pointer}
+#packForm{width:100%;min-width:0}
+#packOwner{flex:0 0 92px;width:92px;min-width:0;height:48px}
+#packIn{min-width:0}
 :focus-visible{outline:3px solid var(--sun);outline-offset:2px}
 [hidden]{display:none!important}
 </style>
