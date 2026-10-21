@@ -52,6 +52,7 @@ dialog input[type=time]{-webkit-appearance:none;appearance:none}
 dialog input[type=time]{text-align:left;display:block}
 dialog input[type=time]::-webkit-date-and-time-value{text-align:left}
 dialog:focus{outline:none}
+dialog select{width:100%;border:1px solid var(--line);background:var(--bg);border-radius:10px;padding:10px;font-size:16px}
 .acts{display:flex;gap:10px;margin-top:16px}
 .acts button{flex:1;border-radius:12px;padding:12px;border:1px solid var(--line);background:none;font-weight:700;cursor:pointer}
 .acts .pri{background:var(--ac);color:var(--acink);border-color:var(--ac)}
@@ -78,6 +79,7 @@ dialog:focus{outline:none}
 </header>
 <nav class="tabs" role="tablist">
   <button role="tab" data-tab="plan" aria-selected="true">予定</button>
+  <button role="tab" data-tab="wish" aria-selected="false">候補</button>
   <button role="tab" data-tab="pack" aria-selected="false">持ち物</button>
   <button role="tab" data-tab="cost" aria-selected="false">費用</button>
 </nav>
@@ -85,6 +87,10 @@ dialog:focus{outline:none}
 <section id="plan">
   <div class="days" id="days"></div>
   <div id="list"></div>
+</section>
+<section id="wish" hidden>
+  <form class="add" id="wishForm" style="flex-wrap:wrap"><input id="wishT" style="flex:1 1 100%" required maxlength="60" placeholder="行きたい場所・やりたいこと" aria-label="候補"><input id="wishP" maxlength="80" placeholder="場所（任意）" aria-label="場所"><button>追加</button></form>
+  <div id="wishList"></div>
 </section>
 <section id="pack" hidden>
   <form class="add" id="packForm"><input id="packIn" placeholder="持ち物を追加" aria-label="持ち物"><select id="packOwner" aria-label="誰の持ち物"><option value="0"></option><option value="1"></option><option value="2">共用</option></select><button>追加</button></form>
@@ -95,6 +101,17 @@ dialog:focus{outline:none}
 </main>
 
 <button class="fab" id="fab">＋ 予定を追加</button>
+
+<dialog id="dlgM" autofocus tabindex="-1">
+  <form method="dialog" id="fm">
+    <h2 id="mh">予定に入れる</h2>
+    <div class="row">
+      <div><label for="mday">何日目</label><select id="mday"></select></div>
+      <div><label for="mtime">時間（任意）</label><input type="time" id="mtime"></div>
+    </div>
+    <div class="acts"><button type="button" id="mcancel">キャンセル</button><button class="pri">予定に入れる</button></div>
+  </form>
+</dialog>
 
 <dialog id="dlg" autofocus tabindex="-1">
   <form method="dialog" id="f">
@@ -128,7 +145,7 @@ const shim={
   collection:c=>{const cr=collection(fs,'trips',TID,c);return{doc:id=>{const r=doc(fs,'trips',TID,c,id);return{set:d=>setDoc(r,d),delete:()=>deleteDoc(r)}},onSnapshot:n=>onSnapshot(cr,q=>n({docs:q.docs.map(d=>({data:()=>d.data()}))}),bad)}}
 };
 const KEY='futari-trip-v1';
-let S={title:'ふたりの旅',start:'',days:3,names:['自分','彼女'],items:[],pack:[]};
+let S={title:'ふたりの旅',start:'',days:3,names:['自分','彼女'],items:[],pack:[],wish:[]};
 try{const r=localStorage.getItem(KEY);if(r)S=Object.assign(S,JSON.parse(r))}catch(e){}
 let cur=0,editId=null;
 const $=id=>document.getElementById(id);
@@ -138,6 +155,8 @@ const syncMeta=()=>{if(!db)return save();clearTimeout(mt);mt=setTimeout(()=>db.d
 const putItem=it=>{if(!db)return save();db.collection('items').doc(it.id).set(it).catch(ig)};
 const rmItem=id=>{if(!db)return save();db.collection('items').doc(id).delete().catch(ig)};
 const putPack=p=>{if(!db)return save();db.collection('pack').doc(p.id).set(p).catch(ig)};
+const putWish=w=>{if(!db)return save();db.collection('wish').doc(w.id).set(w).catch(ig)};
+const rmWish=id=>{if(!db)return save();db.collection('wish').doc(id).delete().catch(ig)};
 const rmPack=id=>{if(!db)return save();db.collection('pack').doc(id).delete().catch(ig)};
 const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const yen=n=>'¥'+Math.round(n).toLocaleString('ja-JP');
@@ -206,7 +225,19 @@ function renderCost(){
   <div class="meta" style="margin-top:10px"><label style="margin:0">名前 <input data-n="0" value="${esc(N[0])}" maxlength="10" style="width:90px"></label><label style="margin:0"><input data-n="1" value="${esc(N[1])}" maxlength="10" style="width:90px"></label></div></div>
   <div class="sum"><div style="font-weight:700;margin-bottom:4px">日ごとの費用</div>${per.map((v,i)=>`<div class="line"><span>${i+1}日目 ${dayLabel(i)}</span><span>${yen(v)}</span></div>`).join('')}</div>`;
 }
-function all(){head();renderDays();renderList();renderPack();renderCost()}
+function renderWish(){
+  const L=[...S.wish].sort((a,b)=>(a.at||0)-(b.at||0));
+  $('wishList').innerHTML=L.length?L.map(w=>`
+  <div class="item">
+    <div class="body">
+      <div class="t">${esc(w.title)}</div>
+      ${w.place?`<div class="sub"><a class="map" target="_blank" rel="noopener" href="https://maps.apple.com/?q=${encodeURIComponent(w.place)}">📍 ${esc(w.place)}</a></div>`:''}
+      <button class="mini" data-wm="${w.id}" style="margin-top:8px;color:var(--ac);font-weight:700">予定に入れる</button>
+    </div>
+    <button class="del" data-wx="${w.id}" aria-label="削除">×</button>
+  </div>`).join(''):`<div class="empty">行きたい場所の候補はまだありません。<br>思いついたらここにためておいて、<br>決まったら予定に入れましょう。</div>`;
+}
+function all(){head();renderDays();renderList();renderPack();renderWish();renderCost()}
 
 // events
 $('title').oninput=e=>{S.title=e.target.value;syncMeta()};
@@ -214,7 +245,7 @@ $('start').onchange=e=>{S.start=e.target.value;syncMeta();all()};
 $('ndays').onchange=e=>{S.days=Math.min(30,Math.max(1,+e.target.value||1));if(cur>=S.days)cur=S.days-1;syncMeta();all()};
 document.querySelector('.tabs').onclick=e=>{const b=e.target.closest('button');if(!b)return;
   document.querySelectorAll('.tabs button').forEach(x=>x.setAttribute('aria-selected',x===b));
-  ['plan','pack','cost'].forEach(t=>$(t).hidden=t!==b.dataset.tab);
+  ['plan','wish','pack','cost'].forEach(t=>$(t).hidden=t!==b.dataset.tab);
   $('fab').hidden=b.dataset.tab!=='plan';};
 $('days').onclick=e=>{const b=e.target.closest('button');if(!b)return;cur=+b.dataset.d;renderDays();renderList()};
 $('list').onclick=e=>{
@@ -237,6 +268,22 @@ $('f').onsubmit=e=>{
   if(!v.title)return;
   let it;if(editId){it=S.items.find(i=>i.id===editId);Object.assign(it,v)}else{it={id:uid(),day:cur,done:false,...v};S.items.push(it)}
   putItem(it);renderList();renderCost();
+};
+$('wishForm').onsubmit=e=>{e.preventDefault();const t=$('wishT').value.trim();if(!t)return;const w={id:uid(),title:t,place:$('wishP').value.trim(),at:Date.now()};S.wish.push(w);$('wishT').value='';$('wishP').value='';putWish(w);renderWish()};
+let moveId=null;
+$('wishList').onclick=e=>{
+  if(e.target.closest('a.map'))return;
+  const m=e.target.closest('[data-wm]'),x=e.target.closest('[data-wx]');
+  if(m){moveId=m.dataset.wm;const w=S.wish.find(i=>i.id===moveId);$('mh').textContent='「'+w.title+'」を予定に入れる';
+    $('mday').innerHTML=Array.from({length:S.days},(_,i)=>`<option value="${i}">${i+1}日目 ${dayLabel(i)}</option>`).join('');$('mday').value=cur;$('mtime').value='';$('dlgM').showModal();if(document.activeElement&&document.activeElement!==$('dlgM'))document.activeElement.blur()}
+  else if(x){if(confirm('この候補を削除しますか？')){rmWish(x.dataset.wx);S.wish=S.wish.filter(i=>i.id!==x.dataset.wx);renderWish()}}
+};
+$('mcancel').onclick=()=>$('dlgM').close();
+$('fm').onsubmit=()=>{
+  const w=S.wish.find(i=>i.id===moveId);if(!w)return;
+  const it={id:uid(),day:+$('mday').value,done:false,time:$('mtime').value,cost:0,title:w.title,place:w.place||'',note:w.note||'',pay:''};
+  S.items.push(it);putItem(it);rmWish(w.id);S.wish=S.wish.filter(i=>i.id!==w.id);
+  cur=it.day;renderDays();renderList();renderCost();renderWish();
 };
 $('packForm').onsubmit=e=>{e.preventDefault();const v=$('packIn').value.trim();if(!v)return;const p={id:uid(),t:v,done:false,o:$('packOwner').value};S.pack.push(p);$('packIn').value='';putPack(p);renderPack()};
 $('packTabs').onclick=e=>{const b=e.target.closest('button');if(!b)return;packF=b.dataset.pf;if(packF!=='all')$('packOwner').value=packF;renderPack()};
@@ -261,6 +308,7 @@ all();
   },ig);
   db.collection('items').onSnapshot(q=>{S.items=q.docs.map(d=>d.data());renderList();renderCost()},ig);
   db.collection('pack').onSnapshot(q=>{S.pack=q.docs.map(d=>d.data());renderPack()},ig);
+  db.collection('wish').onSnapshot(q=>{S.wish=q.docs.map(d=>d.data());renderWish()},ig);
 }catch(e){}})();
 </script>
 </body>
