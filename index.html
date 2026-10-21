@@ -37,6 +37,9 @@ nav.tabs button[aria-selected=true]{background:var(--ac);color:var(--acink)}
 .days{display:flex;gap:8px;overflow-x:auto;padding-bottom:8px;margin-bottom:6px}
 .days button{flex:0 0 auto;border:1px solid var(--line);background:var(--card);border-radius:12px;padding:6px 14px;text-align:center;cursor:pointer;line-height:1.35;font-weight:700}
 .days button small{display:block;color:var(--sub);font-size:12px;font-weight:400}
+.days button.today{border-color:var(--ac)}
+.nx{display:inline-block;background:var(--ac);color:var(--acink);border-radius:8px;padding:0 8px;font-size:12px;font-weight:700;margin-bottom:4px}
+.tk.next{border-color:var(--ac);box-shadow:0 0 0 2px var(--ac)}
 .days button[aria-pressed=true]{background:var(--sun);color:#1a1204;border-color:var(--sun)}
 .days button[aria-pressed=true] small{color:#3a2a0c}
 .tk{position:relative;display:flex;background:var(--card);border:1px solid var(--line);border-radius:14px;margin-bottom:14px}
@@ -57,7 +60,7 @@ nav.tabs button[aria-selected=true]{background:var(--ac);color:var(--acink)}
 .cost{display:inline-block;background:color-mix(in srgb,var(--sun) 24%,transparent);border-radius:8px;padding:0 8px;font-size:13px;margin-top:6px}
 .chk{width:24px;height:24px;accent-color:var(--ac);flex:0 0 auto}
 .del{border:0;background:none;color:var(--sub);font-size:20px;line-height:1;padding:2px 6px;cursor:pointer}
-.add select{border:1px solid var(--line);background:var(--card);border-radius:12px;padding:0 8px;font-size:15px}
+.add select{max-width:112px;min-width:0;border:1px solid var(--line);background:var(--card);border-radius:12px;padding:0 8px;font-size:15px}
 .mini{border:1px solid var(--line);background:var(--card2);border-radius:10px;padding:4px 10px;font-size:13px;cursor:pointer}
 .map{color:var(--link);text-decoration:underline;text-underline-offset:3px}
 .empty{text-align:center;color:var(--sub);padding:36px 12px;border:2px dashed var(--line);border-radius:14px}
@@ -86,7 +89,7 @@ dialog:focus{outline:none}
 .big{font-size:30px;font-weight:700}
 .line{display:flex;justify-content:space-between;padding:6px 0;border-top:1px solid var(--line);font-size:15px}
 .add{display:flex;gap:8px;margin-bottom:12px}
-.add input{flex:1;border:1px solid var(--line);background:var(--card);border-radius:12px;padding:10px;font-size:16px}
+.add input{flex:1;min-width:0;border:1px solid var(--line);background:var(--card);border-radius:12px;padding:10px;font-size:16px}
 .add button{border:0;background:var(--ac);color:var(--acink);border-radius:12px;padding:0 18px;font-weight:700;cursor:pointer}
 :focus-visible{outline:3px solid var(--sun);outline-offset:2px}
 [hidden]{display:none!important}
@@ -100,6 +103,7 @@ dialog:focus{outline:none}
   <div class="meta">
     <label style="margin:0">出発日 <input type="date" id="start"></label>
     <label style="margin:0">日数 <input type="number" id="ndays" min="1" max="30"></label>
+    <label style="margin:0">行き先 <input id="dest" maxlength="20" placeholder="例：福岡（天気用）" style="width:150px"></label>
     <span class="count" id="countdown"></span>
   </div>
   <div class="sub" style="margin-top:8px;display:flex;gap:8px;align-items:center;flex-wrap:wrap"><span id="sync">📱 この端末のみ保存</span><button id="cp" class="mini">リンクをコピー</button><button id="sw" class="mini">コード入力</button></div>
@@ -113,6 +117,7 @@ dialog:focus{outline:none}
 
 <section id="plan">
   <div class="days" id="days"></div>
+  <div class="sub" id="wxline" hidden style="margin:0 0 10px"></div>
   <div style="margin:0 0 10px;display:flex;gap:8px;align-items:center;flex-wrap:wrap"><button class="mini" id="calDay">📅 この日をまとめてカレンダーへ</button><label class="sub" style="margin:0">通知 <select id="alm" class="mini"><option value="0">なし</option><option value="10">10分前</option><option value="30">30分前</option><option value="60">1時間前</option><option value="1440">1日前</option></select></label></div>
   <div id="list"></div>
 </section>
@@ -152,6 +157,7 @@ dialog:focus{outline:none}
 <dialog id="dlg" autofocus tabindex="-1">
   <form method="dialog" id="f">
     <h2 id="dh">予定を追加</h2>
+    <label for="fday">日にち</label><select id="fday"></select>
     <div class="row">
       <div><label for="ftime">時間</label><input type="time" id="ftime"></div>
       <div><label for="fcost">費用（円）</label><input type="number" id="fcost" inputmode="numeric" min="0" placeholder="0"></div>
@@ -168,9 +174,11 @@ dialog:focus{outline:none}
 
 <script type="module">
 import {initializeApp} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-import {getFirestore,doc,setDoc,deleteDoc,collection,onSnapshot} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import {getFirestore,initializeFirestore,persistentLocalCache,persistentMultipleTabManager,doc,setDoc,deleteDoc,collection,onSnapshot} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 const firebaseConfig={apiKey:"AIzaSyDbAuDZZAUCJ69Rqht_tokUao-yMaz2Rhw",authDomain:"trip-c496b.firebaseapp.com",projectId:"trip-c496b",storageBucket:"trip-c496b.firebasestorage.app",messagingSenderId:"376434234702",appId:"1:376434234702:web:879a29f655314c043efa1f"};
-const app=initializeApp(firebaseConfig),fs=getFirestore(app);
+const app=initializeApp(firebaseConfig);
+let fs;try{fs=initializeFirestore(app,{localCache:persistentLocalCache({tabManager:persistentMultipleTabManager()})})}catch(e){fs=getFirestore(app)}
+if('serviceWorker' in navigator)navigator.serviceWorker.register('sw.js').catch(()=>{});
 const TK='futari-trip-id';
 let TID=(location.hash.match(/^#t=([A-Za-z0-9_-]{12,40})$/)||[])[1];
 try{if(!TID)TID=localStorage.getItem(TK)}catch(e){}
@@ -183,13 +191,13 @@ const shim={
   collection:c=>{const cr=collection(fs,'trips',TID,c);return{doc:id=>{const r=doc(fs,'trips',TID,c,id);return{set:d=>setDoc(r,d),delete:()=>deleteDoc(r)}},onSnapshot:n=>onSnapshot(cr,q=>n({docs:q.docs.map(d=>({data:()=>d.data()}))}),bad)}}
 };
 const KEY='futari-trip-v1';
-let S={title:'ふたりの旅',start:'',days:3,names:['自分','彼女'],items:[],pack:[],wish:[]};
+let S={title:'ふたりの旅',start:'',days:3,names:['自分','彼女'],dest:'',items:[],pack:[],wish:[]};
 try{const r=localStorage.getItem(KEY);if(r)S=Object.assign(S,JSON.parse(r))}catch(e){}
 let cur=0,editId=null;
 const $=id=>document.getElementById(id);
 const save=()=>{try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}};
 let db=null,mt;const ig=()=>{};
-const syncMeta=()=>{if(!db)return save();clearTimeout(mt);mt=setTimeout(()=>db.doc('trip/meta').set({title:S.title,start:S.start,days:S.days,names:S.names}).catch(ig),400)};
+const syncMeta=()=>{if(!db)return save();clearTimeout(mt);mt=setTimeout(()=>db.doc('trip/meta').set({title:S.title,start:S.start,days:S.days,names:S.names,dest:S.dest||''}).catch(ig),400)};
 const putItem=it=>{if(!db)return save();db.collection('items').doc(it.id).set(it).catch(ig)};
 const rmItem=id=>{if(!db)return save();db.collection('items').doc(id).delete().catch(ig)};
 const putPack=p=>{if(!db)return save();db.collection('pack').doc(p.id).set(p).catch(ig)};
@@ -206,14 +214,18 @@ function dayWk(i){const d=dayDate(i);return d?W[d.getDay()]:''}
 
 function head(){
   const te=trips.find(t=>t.id===TID);if(te&&te.name!==S.title){te.name=S.title;saveTrips()}
-  if(document.activeElement!==$('title'))$('title').value=S.title;$('start').value=S.start;$('ndays').value=S.days;
+  if(document.activeElement!==$('title'))$('title').value=S.title;$('start').value=S.start;if(document.activeElement!==$('dest'))$('dest').value=S.dest||'';$('ndays').value=S.days;
   const c=$('countdown');
   if(S.start){const t=new Date();t.setHours(0,0,0,0);const n=Math.round((new Date(S.start+'T00:00:00')-t)/864e5);
     c.innerHTML=n>0?`出発まで<b>${n}</b>日`:n===0?'今日出発！':'旅行中';}else c.textContent='';
 }
 function renderDays(){
-  $('days').innerHTML=Array.from({length:S.days},(_,i)=>
-    `<button aria-pressed="${i===cur}" data-d="${i}">${i+1}日目<small>${dayLabel(i)?dayLabel(i)+'（'+dayWk(i)+'）':'&nbsp;'}</small></button>`).join('');
+  const td=ymd(new Date());
+  $('days').innerHTML=Array.from({length:S.days},(_,i)=>{const d=dayDate(i),w=WX[i],t=d&&ymd(d)===td;
+    return `<button class="${t?'today':''}" aria-pressed="${i===cur}" data-d="${i}">${i+1}日目<small>${d?(t?'今日 ':'')+dayLabel(i)+'（'+dayWk(i)+'）':'&nbsp;'}</small>${w?`<small>${WC(w.c)[0]} ${w.hi}°</small>`:''}</button>`}).join('');
+  const w=WX[cur],el=$('wxline');
+  const txt=w?`${WC(w.c)[0]} ${WC(w.c)[1]}　最高${w.hi}° / 最低${w.lo}°　降水確率${w.pop??'-'}%`:(S.dest&&S.start?'天気予報は、出発の約2週間前から表示されます':'');
+  el.textContent=txt;el.hidden=!txt;
 }
 const CATS={plane:['✈️','#5aa9e6'],train:['🚆','#2fb59b'],bus:['🚌','#7bb661'],food:['🍜','#f4a43a'],sight:['⛩️','#e4513a'],stay:['🏨','#9b8cf0'],other:['📌','#8a98b3']};
 function kind(t){
@@ -227,11 +239,13 @@ function kind(t){
 function guess(x){const t=x.title||'';return kind(t)||(/タクシー|レンタカー|フェリー|徒歩|移動/.test(t)?'other':kind(t+(x.place||'')))||'other'}
 function renderList(){
   const L=S.items.filter(x=>x.day===cur).sort((a,b)=>(a.time||'99:99').localeCompare(b.time||'99:99'));
+  const dd=dayDate(cur),nw=new Date(),hm=pad(nw.getHours())+':'+pad(nw.getMinutes());
+  const nx=dd&&ymd(dd)===ymd(nw)?L.find(x=>x.time&&!x.done&&x.time>=hm):null;
   $('list').innerHTML=L.length?L.map(x=>{const k=CATS[x.cat]?x.cat:guess(x),[ic,cc]=CATS[k];return `
-  <div class="tk ${x.done?'done':''}" style="--cc:${cc}">
+  <div class="tk ${x.done?'done':''} ${nx===x?'next':''}" style="--cc:${cc}">
     <div class="stub"><div class="ic">${ic}</div><div class="tm">${x.time||'--:--'}</div></div>
     <div class="body" data-e="${x.id}">
-      <div class="t">${esc(x.title)}</div>
+      ${nx===x?'<span class="nx">次の予定</span>':''}<div class="t">${esc(x.title)}</div>
       ${x.place?`<div class="sub"><a class="map" target="_blank" rel="noopener" href="https://maps.apple.com/?q=${encodeURIComponent(x.place)}">📍 ${esc(x.place)}</a></div>`:''}
       ${x.note?`<div class="sub">${esc(x.note)}</div>`:''}
       ${x.photos&&x.photos.length?`<div class="thumbs">${x.photos.map((p,i)=>`<img src="${p}" data-pv="${x.id}:${i}" alt="写真">`).join('')}</div>`:''}
@@ -281,7 +295,7 @@ if(!Array.isArray(trips))trips=[];
 const saveTrips=()=>{try{localStorage.setItem(TL,JSON.stringify(trips))}catch(e){}};
 let ent=trips.find(t=>t.id===TID);
 if(!ent){ent={id:TID,name:S.title||'ふたりの旅'};trips.push(ent);saveTrips()}
-Object.assign(S,{title:ent.name||'ふたりの旅',start:'',days:3,names:['自分','彼女'],items:[],pack:[],wish:[]});
+Object.assign(S,{title:ent.name||'ふたりの旅',start:'',days:3,names:['自分','彼女'],dest:'',items:[],pack:[],wish:[]});
 const newId=()=>Array.from(crypto.getRandomValues(new Uint8Array(20)),b=>'abcdefghijkmnpqrstuvwxyz23456789'[b%32]).join('');
 function goTrip(id){try{localStorage.setItem(TK,id)}catch(e){}location.hash='t='+id;location.reload()}
 function renderTrips(){
@@ -341,6 +355,27 @@ function addCal(list){
 $('calDay').onclick=()=>addCal(S.items.filter(x=>x.day===cur));
 $('alm').value=String(ALM);
 $('alm').onchange=e=>{ALM=+e.target.value;try{localStorage.setItem('futari-alarm',String(ALM))}catch(x){}};
+let WX={},wxKey='',didAuto=false;
+const WC=c=>c===0?['☀️','晴れ']:c<=2?['🌤️','晴れ時々くもり']:c===3?['☁️','くもり']:c<=48?['🌫️','霧']:c<=57?['🌦️','霧雨']:c<=67?['🌧️','雨']:c<=77?['❄️','雪']:c<=82?['🌦️','にわか雨']:c<=86?['❄️','雪']:['⛈️','雷雨'];
+const iso=d=>d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate());
+async function loadWeather(){
+  if(!S.dest||!S.start){WX={};wxKey='';renderDays();return}
+  const key=S.dest+'|'+S.start+'|'+S.days;if(key===wxKey)return;wxKey=key;
+  const t0=new Date();t0.setHours(0,0,0,0);const idx=[];
+  for(let i=0;i<S.days;i++){const df=Math.round((dayDate(i)-t0)/864e5);if(df>=0&&df<=15)idx.push(i)}
+  if(!idx.length){WX={};renderDays();return}
+  try{
+    const g=await(await fetch('https://geocoding-api.open-meteo.com/v1/search?name='+encodeURIComponent(S.dest)+'&language=ja&count=1')).json();
+    const p=g.results&&g.results[0];if(!p){WX={};renderDays();return}
+    const r=await(await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${p.latitude}&longitude=${p.longitude}&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max&timezone=auto&start_date=${iso(dayDate(idx[0]))}&end_date=${iso(dayDate(idx[idx.length-1]))}`)).json();
+    const o={};r.daily.time.forEach((t,k)=>{const i=idx.find(j=>iso(dayDate(j))===t);if(i!==undefined)o[i]={c:r.daily.weather_code[k],hi:Math.round(r.daily.temperature_2m_max[k]),lo:Math.round(r.daily.temperature_2m_min[k]),pop:r.daily.precipitation_probability_max[k]}});
+    WX=o;
+  }catch(e){WX={};wxKey=''}
+  renderDays();
+}
+setInterval(()=>{if(!document.hidden)renderList()},60000);
+function setSync(){if(db)$('sync').textContent=navigator.onLine?'👫 ふたりで共有中':'📴 オフライン（つながると自動で同期）'}
+addEventListener('online',setSync);addEventListener('offline',setSync);
 function renderWish(){
   const L=[...S.wish].sort((a,b)=>(a.at||0)-(b.at||0));
   $('wishList').innerHTML=L.length?L.map(w=>`
@@ -357,8 +392,9 @@ function all(){head();renderDays();renderList();renderPack();renderWish();render
 
 // events
 $('title').oninput=e=>{S.title=e.target.value;syncMeta()};
-$('start').onchange=e=>{S.start=e.target.value;syncMeta();all()};
-$('ndays').onchange=e=>{S.days=Math.min(30,Math.max(1,+e.target.value||1));if(cur>=S.days)cur=S.days-1;syncMeta();all()};
+$('start').onchange=e=>{S.start=e.target.value;syncMeta();all();loadWeather()};
+$('dest').onchange=e=>{S.dest=e.target.value.trim();syncMeta();wxKey='';loadWeather()};
+$('ndays').onchange=e=>{S.days=Math.min(30,Math.max(1,+e.target.value||1));if(cur>=S.days)cur=S.days-1;syncMeta();all();loadWeather()};
 document.querySelector('.tabs').onclick=e=>{const b=e.target.closest('button');if(!b)return;
   document.querySelectorAll('.tabs button').forEach(x=>x.setAttribute('aria-selected',x===b));
   ['plan','wish','pack','cost'].forEach(t=>$(t).hidden=t!==b.dataset.tab);
@@ -376,16 +412,16 @@ $('list').onclick=e=>{
 function openDlg(id){
   editId=id||null;const it=id?S.items.find(i=>i.id===id):{};
   $('dh').textContent=id?'予定を編集':`${cur+1}日目の予定を追加`;
-  $('ftime').value=it.time||'';$('fcost').value=it.cost||'';$('ftitle').value=it.title||'';$('fplace').value=it.place||'';$('fnote').value=it.note||'';$('o0').textContent=S.names[0];$('o1').textContent=S.names[1];$('fpay').value=it.pay||'';$('fcat').value=it.cat||'';editPh=[...(it.photos||[])];renderPh();
+  $('ftime').value=it.time||'';$('fcost').value=it.cost||'';$('ftitle').value=it.title||'';$('fplace').value=it.place||'';$('fnote').value=it.note||'';$('o0').textContent=S.names[0];$('o1').textContent=S.names[1];$('fpay').value=it.pay||'';$('fcat').value=it.cat||'';$('fday').innerHTML=Array.from({length:S.days},(_,i)=>`<option value="${i}">${i+1}日目 ${dayLabel(i)}</option>`).join('');$('fday').value=String(it.day!==undefined?it.day:cur);editPh=[...(it.photos||[])];renderPh();
   $('dlg').showModal();if(document.activeElement&&document.activeElement!==$('dlg'))document.activeElement.blur();
 }
 $('fab').onclick=()=>openDlg();
 $('cancel').onclick=()=>$('dlg').close();
 $('f').onsubmit=e=>{
-  const v={time:$('ftime').value,cost:+$('fcost').value||0,title:$('ftitle').value.trim(),place:$('fplace').value.trim(),note:$('fnote').value.trim(),pay:$('fpay').value,cat:$('fcat').value,photos:editPh.slice()};
+  const v={time:$('ftime').value,cost:+$('fcost').value||0,title:$('ftitle').value.trim(),place:$('fplace').value.trim(),note:$('fnote').value.trim(),pay:$('fpay').value,cat:$('fcat').value,day:+$('fday').value,photos:editPh.slice()};
   if(!v.title)return;
   let it;if(editId){it=S.items.find(i=>i.id===editId);Object.assign(it,v)}else{it={id:uid(),day:cur,done:false,...v};S.items.push(it)}
-  putItem(it);renderList();renderCost();
+  cur=it.day;renderDays();putItem(it);renderList();renderCost();
 };
 $('wishForm').onsubmit=e=>{e.preventDefault();const t=$('wishT').value.trim();if(!t)return;const w={id:uid(),title:t,place:$('wishP').value.trim(),at:Date.now()};S.wish.push(w);$('wishT').value='';$('wishP').value='';putWish(w);renderWish()};
 let moveId=null;
@@ -418,10 +454,11 @@ $('sw').onclick=()=>{const v=prompt('彼女から届いたリンクかコード�
 all();
 (async()=>{try{
   db=shim;
-  $('sync').textContent='👫 ふたりで共有中';
+  setSync();
   db.doc('trip/meta').onSnapshot(s=>{
-    if(s.exists){const d=s.data();S.title=d.title??S.title;S.start=d.start||'';S.days=d.days||S.days;if(d.names)S.names=d.names;if(cur>=S.days)cur=S.days-1;all()}
-    else{db.doc('trip/meta').set({title:S.title,start:S.start,days:S.days,names:S.names}).catch(ig);
+    if(s.exists){const d=s.data();S.title=d.title??S.title;S.start=d.start||'';S.days=d.days||S.days;if(d.names)S.names=d.names;S.dest=d.dest||'';if(!didAuto&&S.start){didAuto=true;const t0=new Date();t0.setHours(0,0,0,0);const k=Math.round((t0-new Date(S.start+'T00:00:00'))/864e5);if(k>=0&&k<S.days)cur=k}
+      if(cur>=S.days)cur=S.days-1;all();loadWeather()}
+    else{db.doc('trip/meta').set({title:S.title,start:S.start,days:S.days,names:S.names,dest:S.dest||''}).catch(ig);
       }
   },ig);
   db.collection('items').onSnapshot(q=>{S.items=q.docs.map(d=>d.data());renderList();renderCost()},ig);
