@@ -86,6 +86,7 @@ dialog select{width:100%;border:1px solid var(--line);background:var(--bg);borde
 
 <section id="plan">
   <div class="days" id="days"></div>
+  <div style="margin:0 0 10px;display:flex;gap:8px;align-items:center;flex-wrap:wrap"><button class="mini" id="calDay">📅 この日をまとめてカレンダーへ</button><label class="sub" style="margin:0">通知 <select id="alm" class="mini"><option value="0">なし</option><option value="10">10分前</option><option value="30">30分前</option><option value="60">1時間前</option><option value="1440">1日前</option></select></label></div>
   <div id="list"></div>
 </section>
 <section id="wish" hidden>
@@ -186,6 +187,7 @@ function renderList(){
       <div class="t">${esc(x.title)}</div>
       ${x.place?`<div class="sub"><a class="map" target="_blank" rel="noopener" href="https://maps.apple.com/?q=${encodeURIComponent(x.place)}">📍 ${esc(x.place)}</a></div>`:''}
       ${x.note?`<div class="sub">${esc(x.note)}</div>`:''}
+      <div><button class="mini" data-ca="${x.id}" style="margin-top:6px">📅 カレンダーに追加</button></div>
       ${x.cost?`<span class="cost">${yen(x.cost)}${x.pay==='0'||x.pay==='1'?'（'+esc(S.names[+x.pay])+'）':''}</span>`:''}
     </div>
     <button class="del" data-x="${x.id}" aria-label="削除">×</button>
@@ -225,6 +227,37 @@ function renderCost(){
   <div class="meta" style="margin-top:10px"><label style="margin:0">名前 <input data-n="0" value="${esc(N[0])}" maxlength="10" style="width:90px"></label><label style="margin:0"><input data-n="1" value="${esc(N[1])}" maxlength="10" style="width:90px"></label></div></div>
   <div class="sum"><div style="font-weight:700;margin-bottom:4px">日ごとの費用</div>${per.map((v,i)=>`<div class="line"><span>${i+1}日目 ${dayLabel(i)}</span><span>${yen(v)}</span></div>`).join('')}</div>`;
 }
+let ALM=30;try{const v=localStorage.getItem('futari-alarm');if(v!==null)ALM=+v}catch(e){}
+const pad=n=>String(n).padStart(2,'0');
+const ymd=d=>''+d.getFullYear()+pad(d.getMonth()+1)+pad(d.getDate());
+const hms=t=>ymd(t)+'T'+pad(t.getHours())+pad(t.getMinutes())+'00';
+const ie=t=>String(t||'').replace(/\\/g,'\\\\').replace(/;/g,'\\;').replace(/,/g,'\\,').replace(/\r?\n/g,'\\n');
+function mkICS(list){
+  const now=new Date().toISOString().replace(/[-:]/g,'').replace(/\.\d+/,'');
+  const L=['BEGIN:VCALENDAR','VERSION:2.0','PRODID:-//futari-trip//JP','CALSCALE:GREGORIAN'];
+  list.forEach(x=>{
+    const d=dayDate(x.day);L.push('BEGIN:VEVENT','UID:'+x.id+'@futari-trip','DTSTAMP:'+now);
+    if(x.time){const [h,m]=x.time.split(':').map(Number);const st=new Date(d);st.setHours(h,m,0,0);L.push('DTSTART:'+hms(st),'DTEND:'+hms(new Date(st.getTime()+36e5)))}
+    else{const n=new Date(d);n.setDate(n.getDate()+1);L.push('DTSTART;VALUE=DATE:'+ymd(d),'DTEND;VALUE=DATE:'+ymd(n))}
+    L.push('SUMMARY:'+ie(x.title));
+    if(x.place)L.push('LOCATION:'+ie(x.place));
+    if(x.note)L.push('DESCRIPTION:'+ie(x.note));
+    if(x.time&&ALM>0)L.push('BEGIN:VALARM','ACTION:DISPLAY','DESCRIPTION:'+ie(x.title),'TRIGGER:-PT'+ALM+'M','END:VALARM');
+    L.push('END:VEVENT');
+  });
+  L.push('END:VCALENDAR');return L.join('\r\n');
+}
+function addCal(list){
+  list=list.filter(Boolean);
+  if(!S.start)return alert('先に、画面上部の「出発日」を入れてください。');
+  if(!list.length)return alert('この日に追加できる予定がありません。');
+  const u=URL.createObjectURL(new Blob([mkICS(list)],{type:'text/calendar;charset=utf-8'}));
+  const a=document.createElement('a');a.href=u;document.body.appendChild(a);a.click();a.remove();
+  setTimeout(()=>URL.revokeObjectURL(u),60000);
+}
+$('calDay').onclick=()=>addCal(S.items.filter(x=>x.day===cur));
+$('alm').value=String(ALM);
+$('alm').onchange=e=>{ALM=+e.target.value;try{localStorage.setItem('futari-alarm',String(ALM))}catch(x){}};
 function renderWish(){
   const L=[...S.wish].sort((a,b)=>(a.at||0)-(b.at||0));
   $('wishList').innerHTML=L.length?L.map(w=>`
@@ -249,6 +282,7 @@ document.querySelector('.tabs').onclick=e=>{const b=e.target.closest('button');i
   $('fab').hidden=b.dataset.tab!=='plan';};
 $('days').onclick=e=>{const b=e.target.closest('button');if(!b)return;cur=+b.dataset.d;renderDays();renderList()};
 $('list').onclick=e=>{
+  const ca=e.target.closest('[data-ca]');if(ca){addCal([S.items.find(i=>i.id===ca.dataset.ca)]);return}
   if(e.target.closest('a.map'))return;
   const c=e.target.closest('[data-c]'),x=e.target.closest('[data-x]'),ed=e.target.closest('[data-e]');
   if(c){const it=S.items.find(i=>i.id===c.dataset.c);it.done=c.checked;putItem(it);renderList()}
