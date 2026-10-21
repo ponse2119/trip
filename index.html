@@ -90,6 +90,10 @@ dialog:focus{outline:none}
 .line{display:flex;justify-content:space-between;padding:6px 0;border-top:1px solid var(--line);font-size:15px}
 .add{display:flex;gap:8px;margin-bottom:12px}
 .add input{flex:1;min-width:0;border:1px solid var(--line);background:var(--card);border-radius:12px;padding:10px;font-size:16px}
+/* Keep the wish-list day selector and place field inside the mobile viewport */
+#wishForm>.row{width:100%;max-width:100%;min-width:0;flex:1 1 100%}
+#wishForm #wishDay{flex:0 0 112px;width:112px;max-width:112px;min-width:0}
+#wishForm #wishP{flex:1 1 0;width:0;min-width:0;max-width:100%}
 .add button{border:0;background:var(--ac);color:var(--acink);border-radius:12px;padding:0 18px;font-weight:700;cursor:pointer}
 :focus-visible{outline:3px solid var(--sun);outline-offset:2px}
 [hidden]{display:none!important}
