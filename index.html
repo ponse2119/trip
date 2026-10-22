@@ -45,6 +45,8 @@ nav.tabs button[aria-selected=true]{background:var(--ac);color:var(--acink)}
 body.ro .fab,body.ro .add,body.ro .del,body.ro [data-wm]{display:none!important}
 body.ro .chk,body.ro #title,body.ro .meta input,body.ro #cost input,body.ro [data-po]{pointer-events:none}
 body.ro .tk .body,body.ro .item .body{cursor:default}
+.racts{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
+.rt{display:inline-block;text-decoration:none;color:var(--ink);max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .gh{font:700 16px "Shippori Mincho B1","Hiragino Mincho ProN",serif;margin:18px 0 8px;padding-left:10px;border-left:4px solid var(--ac)}
 .nx{display:inline-block;background:var(--ac);color:var(--acink);border-radius:8px;padding:0 8px;font-size:12px;font-weight:700;margin-bottom:4px}
 .tk.next{border-color:var(--ac);box-shadow:0 0 0 2px var(--ac)}
@@ -127,7 +129,7 @@ dialog:focus{outline:none}
 <section id="plan">
   <div class="days" id="days"></div>
   <div class="sub" id="wxline" hidden style="margin:0 0 10px"></div>
-  <div style="margin:0 0 10px;display:flex;gap:8px;align-items:center;flex-wrap:wrap"><button class="mini" id="calDay">📅 この日をまとめてカレンダーへ</button><label class="sub" style="margin:0">通知 <select id="alm" class="mini"><option value="0">なし</option><option value="10">10分前</option><option value="30">30分前</option><option value="60">1時間前</option><option value="1440">1日前</option></select></label></div>
+  <div style="margin:0 0 10px;display:flex;gap:8px;align-items:center;flex-wrap:wrap"><button class="mini" id="calDay">📅 この日をまとめてカレンダーへ</button><label class="sub" style="margin:0">通知 <select id="alm" class="mini"><option value="0">なし</option><option value="10">10分前</option><option value="30">30分前</option><option value="60">1時間前</option><option value="1440">1日前</option></select></label><label class="sub" style="margin:0">経路 <select id="rmode" class="mini"><option value="r">電車・バス</option><option value="w">徒歩</option><option value="d">車</option></select></label></div>
   <div id="list"></div>
 </section>
 <section id="wish" hidden>
@@ -270,7 +272,7 @@ function renderList(){
   const L=S.items.filter(x=>x.day===cur).sort((a,b)=>(a.time||'99:99').localeCompare(b.time||'99:99'));
   const dd=dayDate(cur),nw=new Date(),hm=pad(nw.getHours())+':'+pad(nw.getMinutes());
   const nx=dd&&ymd(dd)===ymd(nw)?L.find(x=>x.time&&!x.done&&x.time>=hm):null;
-  $('list').innerHTML=L.length?L.map(x=>{const k=CATS[x.cat]?x.cat:guess(x),[ic,cc]=CATS[k];return `
+  $('list').innerHTML=L.length?L.map((x,ix)=>{const nxt=L.slice(ix+1).find(y=>y.place);const k=CATS[x.cat]?x.cat:guess(x),[ic,cc]=CATS[k];return `
   <div class="tk ${x.done?'done':''} ${nx===x?'next':''}" style="--cc:${cc}">
     <div class="stub"><div class="ic">${ic}</div><div class="tm">${x.time||'--:--'}</div></div>
     <div class="body" data-e="${x.id}">
@@ -279,7 +281,7 @@ function renderList(){
       ${x.note?`<div class="sub">${esc(x.note)}</div>`:''}
       ${x.photos&&x.photos.length?`<div class="thumbs">${x.photos.map((p,i)=>`<img src="${p}" data-pv="${x.id}:${i}" alt="写真">`).join('')}</div>`:''}
       ${x.cost?`<span class="cost">${yen(x.cost)}${x.pay==='0'||x.pay==='1'?'（'+esc(S.names[+x.pay])+'）':''}</span>`:''}
-      <div><button class="mini" data-ca="${x.id}" style="margin-top:8px">📅 カレンダーに追加</button></div>
+      <div class="racts"><button class="mini" data-ca="${x.id}">📅 カレンダーに追加</button>${x.place?`<a class="mini rt" target="_blank" rel="noopener" href="https://maps.apple.com/?daddr=${encodeURIComponent(x.place)}&dirflg=${RM}">現在地から</a>`:''}${x.place&&nxt?`<a class="mini rt" target="_blank" rel="noopener" href="https://maps.apple.com/?saddr=${encodeURIComponent(x.place)}&daddr=${encodeURIComponent(nxt.place)}&dirflg=${RM}">次へ：${esc(nxt.title)}</a>`:''}</div>
     </div>
     <div class="side"><input type="checkbox" class="chk" data-c="${x.id}" ${x.done?'checked':''} aria-label="完了"><button class="del" data-x="${x.id}" aria-label="削除">×</button></div>
   </div>`}).join(''):`<div class="empty">この日の予定はまだありません。<br>「＋ 予定を追加」から入れてみましょう。</div>`;
@@ -382,6 +384,9 @@ function addCal(list){
   setTimeout(()=>URL.revokeObjectURL(u),60000);
 }
 $('calDay').onclick=()=>addCal(S.items.filter(x=>x.day===cur));
+let RM='r';try{RM=localStorage.getItem('futari-rmode')||'r'}catch(e){}
+$('rmode').value=RM;
+$('rmode').onchange=e=>{RM=e.target.value;try{localStorage.setItem('futari-rmode',RM)}catch(x){}renderList()};
 $('alm').value=String(ALM);
 $('alm').onchange=e=>{ALM=+e.target.value;try{localStorage.setItem('futari-alarm',String(ALM))}catch(x){}};
 let WX={},wxKey='',didAuto=false;
@@ -496,7 +501,7 @@ $('days').onclick=e=>{const b=e.target.closest('button');if(!b)return;cur=+b.dat
 $('list').onclick=e=>{
   const pv=e.target.closest('[data-pv]');if(pv){const [id,i]=pv.dataset.pv.split(':');const it=S.items.find(z=>z.id===id);if(it&&it.photos){$('pimg').src=it.photos[+i];$('dlgP').showModal()}return}
   const ca=e.target.closest('[data-ca]');if(ca){addCal([S.items.find(i=>i.id===ca.dataset.ca)]);return}
-  if(e.target.closest('a.map'))return;
+  if(e.target.closest('a.map,a.rt'))return;
   const c=e.target.closest('[data-c]'),x=e.target.closest('[data-x]'),ed=e.target.closest('[data-e]');
   if(c){const it=S.items.find(i=>i.id===c.dataset.c);it.done=c.checked;putItem(it);renderList()}
   else if(x){if(confirm('この予定を削除しますか？')){rmItem(x.dataset.x);S.items=S.items.filter(i=>i.id!==x.dataset.x);renderList();renderCost()}}
