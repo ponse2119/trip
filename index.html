@@ -38,6 +38,13 @@ nav.tabs button[aria-selected=true]{background:var(--ac);color:var(--acink)}
 .days button{flex:0 0 auto;border:1px solid var(--line);background:var(--card);border-radius:12px;padding:6px 14px;text-align:center;cursor:pointer;line-height:1.35;font-weight:700}
 .days button small{display:block;color:var(--sub);font-size:12px;font-weight:400}
 .days button.today{border-color:var(--ac)}
+.banner{background:color-mix(in srgb,var(--sun) 30%,#fff);border:1px solid var(--sun);border-radius:12px;padding:8px 12px;margin-bottom:10px;font-weight:700;font-size:14px}
+#maint{position:fixed;inset:0;z-index:50;background:var(--bg);display:flex;align-items:center;justify-content:center;text-align:center;padding:24px}
+.mbox h1{font:800 28px "Shippori Mincho B1","Hiragino Mincho ProN",serif;margin:0 0 12px}
+.mbox p{color:var(--sub);margin:0 0 24px;overflow-wrap:anywhere}
+body.ro .fab,body.ro .add,body.ro .del,body.ro [data-wm]{display:none!important}
+body.ro .chk,body.ro #title,body.ro .meta input,body.ro #cost input,body.ro [data-po]{pointer-events:none}
+body.ro .tk .body,body.ro .item .body{cursor:default}
 .gh{font:700 16px "Shippori Mincho B1","Hiragino Mincho ProN",serif;margin:18px 0 8px;padding-left:10px;border-left:4px solid var(--ac)}
 .nx{display:inline-block;background:var(--ac);color:var(--acink);border-radius:8px;padding:0 8px;font-size:12px;font-weight:700;margin-bottom:4px}
 .tk.next{border-color:var(--ac);box-shadow:0 0 0 2px var(--ac)}
@@ -98,6 +105,7 @@ dialog:focus{outline:none}
 </head>
 <body>
 <main>
+<div class="banner" id="banner" hidden></div>
 <header>
   <div style="display:flex;justify-content:flex-end"><button class="mini" id="trips" type="button">旅の一覧 ▾</button></div>
   <input id="title" aria-label="旅のタイトル" placeholder="旅のタイトル" maxlength="40">
@@ -107,7 +115,7 @@ dialog:focus{outline:none}
     <label style="margin:0">行き先 <input id="dest" maxlength="20" placeholder="例：福岡（天気用）" style="width:150px"></label>
     <span class="count" id="countdown"></span>
   </div>
-  <div class="sub" style="margin-top:8px;display:flex;gap:8px;align-items:center;flex-wrap:wrap"><span id="sync">📱 この端末のみ保存</span><button id="cp" class="mini">リンクをコピー</button><button id="sw" class="mini">コード入力</button></div>
+  <div class="sub" style="margin-top:8px;display:flex;gap:8px;align-items:center;flex-wrap:wrap"><span id="sync">📱 この端末のみ保存</span><button id="cp" class="mini">リンクをコピー</button><button id="sw" class="mini">コード入力</button><button id="adm" class="mini" type="button">管理</button></div>
 </header>
 <nav class="tabs" role="tablist">
   <button role="tab" data-tab="plan" aria-selected="true">予定</button>
@@ -159,6 +167,14 @@ dialog:focus{outline:none}
   </form>
 </dialog>
 
+<div id="maint" hidden><div class="mbox"><h1>メンテナンス中</h1><p id="mtext"></p><button class="mini" id="madm" type="button">管理者の方はこちら</button></div></div>
+
+<dialog id="dlgA" autofocus tabindex="-1">
+  <h2>管理</h2>
+  <div id="abody"></div>
+  <div class="acts"><button type="button" id="aclose">閉じる</button></div>
+</dialog>
+
 <dialog id="dlgT" autofocus tabindex="-1">
   <h2>旅の一覧</h2>
   <div id="tlist"></div>
@@ -200,23 +216,23 @@ try{localStorage.setItem(TK,TID)}catch(e){}
 history.replaceState(null,'','#t='+TID);
 const bad=()=>{document.getElementById('sync').textContent='⚠ 同期エラー（ルールを確認）'};
 const shim={
-  doc:()=>{const r=doc(fs,'trips',TID,'meta','main');return{set:d=>setDoc(r,d),onSnapshot:(n)=>onSnapshot(r,x=>n({exists:x.exists(),data:()=>x.data()}),bad)}},
+  doc:()=>{const r=doc(fs,'trips',TID,'meta','main');return{set:d=>setDoc(r,d,{merge:true}),onSnapshot:(n)=>onSnapshot(r,x=>n({exists:x.exists(),data:()=>x.data()}),bad)}},
   collection:c=>{const cr=collection(fs,'trips',TID,c);return{doc:id=>{const r=doc(fs,'trips',TID,c,id);return{set:d=>setDoc(r,d),delete:()=>deleteDoc(r)}},onSnapshot:n=>onSnapshot(cr,q=>n({docs:q.docs.map(d=>({data:()=>d.data()}))}),bad)}}
 };
 const KEY='futari-trip-v1';
-let S={title:'ふたりの旅',start:'',days:3,names:['自分','彼女'],dest:'',items:[],pack:[],wish:[]};
+let S={title:'ふたりの旅',start:'',days:3,names:['自分','彼女'],dest:'',mode:'normal',mmsg:'',pw:'',items:[],pack:[],wish:[]};
 try{const r=localStorage.getItem(KEY);if(r)S=Object.assign(S,JSON.parse(r))}catch(e){}
 let cur=0,editId=null;
 const $=id=>document.getElementById(id);
 const save=()=>{try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}};
 let db=null,mt;const ig=()=>{};
-const syncMeta=()=>{if(!db)return save();clearTimeout(mt);mt=setTimeout(()=>db.doc('trip/meta').set({title:S.title,start:S.start,days:S.days,names:S.names,dest:S.dest||''}).catch(ig),400)};
-const putItem=it=>{if(!db)return save();db.collection('items').doc(it.id).set(it).catch(ig)};
-const rmItem=id=>{if(!db)return save();db.collection('items').doc(id).delete().catch(ig)};
-const putPack=p=>{if(!db)return save();db.collection('pack').doc(p.id).set(p).catch(ig)};
-const putWish=w=>{if(!db)return save();db.collection('wish').doc(w.id).set(w).catch(ig)};
-const rmWish=id=>{if(!db)return save();db.collection('wish').doc(id).delete().catch(ig)};
-const rmPack=id=>{if(!db)return save();db.collection('pack').doc(id).delete().catch(ig)};
+const syncMeta=()=>{if(RO())return;if(!db)return save();clearTimeout(mt);mt=setTimeout(()=>db.doc('trip/meta').set({title:S.title,start:S.start,days:S.days,names:S.names,dest:S.dest||''}).catch(ig),400)};
+const putItem=it=>{if(RO())return;if(!db)return save();db.collection('items').doc(it.id).set(it).catch(ig)};
+const rmItem=id=>{if(RO())return;if(!db)return save();db.collection('items').doc(id).delete().catch(ig)};
+const putPack=p=>{if(RO())return;if(!db)return save();db.collection('pack').doc(p.id).set(p).catch(ig)};
+const putWish=w=>{if(RO())return;if(!db)return save();db.collection('wish').doc(w.id).set(w).catch(ig)};
+const rmWish=id=>{if(RO())return;if(!db)return save();db.collection('wish').doc(id).delete().catch(ig)};
+const rmPack=id=>{if(RO())return;if(!db)return save();db.collection('pack').doc(id).delete().catch(ig)};
 const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const yen=n=>'¥'+Math.round(n).toLocaleString('ja-JP');
 const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,6);
@@ -308,7 +324,7 @@ if(!Array.isArray(trips))trips=[];
 const saveTrips=()=>{try{localStorage.setItem(TL,JSON.stringify(trips))}catch(e){}};
 let ent=trips.find(t=>t.id===TID);
 if(!ent){ent={id:TID,name:S.title||'ふたりの旅'};trips.push(ent);saveTrips()}
-Object.assign(S,{title:ent.name||'ふたりの旅',start:'',days:3,names:['自分','彼女'],dest:'',items:[],pack:[],wish:[]});
+Object.assign(S,{title:ent.name||'ふたりの旅',start:'',days:3,names:['自分','彼女'],dest:'',mode:'normal',mmsg:'',pw:'',items:[],pack:[],wish:[]});
 const newId=()=>Array.from(crypto.getRandomValues(new Uint8Array(20)),b=>'abcdefghijkmnpqrstuvwxyz23456789'[b%32]).join('');
 function goTrip(id){try{localStorage.setItem(TK,id)}catch(e){}location.hash='t='+id;location.reload()}
 function renderTrips(){
@@ -389,6 +405,42 @@ async function loadWeather(){
 setInterval(()=>{if(!document.hidden)renderList()},60000);
 function setSync(){if(db)$('sync').textContent=navigator.onLine?'👫 ふたりで共有中':'📴 オフライン（つながると自動で同期）'}
 addEventListener('online',setSync);addEventListener('offline',setSync);
+const isAdm=()=>{try{return localStorage.getItem('futari-adm-'+TID)==='1'}catch(e){return false}};
+const setAdm=v=>{try{v?localStorage.setItem('futari-adm-'+TID,'1'):localStorage.removeItem('futari-adm-'+TID)}catch(e){}};
+const RO=()=>S.mode==='readonly'&&!isAdm();
+const setMeta=o=>{Object.assign(S,o);if(db)db.doc('trip/meta').set(o).catch(ig)};
+async function hashPw(p){const b=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(TID+':'+p));return Array.from(new Uint8Array(b),x=>x.toString(16).padStart(2,'0')).join('')}
+function applyMode(){
+  const adm=isAdm(),m=S.mode;
+  document.body.classList.toggle('ro',m==='readonly'&&!adm);
+  $('maint').hidden=!(m==='maint'&&!adm);
+  $('mtext').textContent=S.mmsg||'ただいま更新作業中です。しばらくお待ちください。';
+  const b=$('banner');
+  b.textContent=adm&&m==='maint'?'管理者モード：メンテナンス中です（ほかの人には「メンテナンス中」と表示されています）':adm&&m==='readonly'?'管理者モード：閲覧専用です（ほかの人は見るだけです）':m==='readonly'?'閲覧専用モードです。いまは見るだけで、編集はできません。':'';
+  b.hidden=!b.textContent;
+}
+function renderAdmin(){
+  const b=$('abody'),adm=isAdm();
+  if(!S.pw)b.innerHTML='<p class="sub">管理用のパスコード（4文字以上）を決めてください。メンテナンスや閲覧専用の切り替えに使います。</p><input id="apw" type="password" autocomplete="off" placeholder="パスコード"><div class="acts"><button type="button" class="pri" data-act="set">設定する</button></div>';
+  else if(!adm)b.innerHTML='<p class="sub">パスコードを入力すると、管理者になれます（この端末のみ）。</p><input id="apw" type="password" autocomplete="off" placeholder="パスコード"><div class="acts"><button type="button" class="pri" data-act="unlock">ロック解除</button></div>';
+  else{
+    const M=[['normal','通常'],['readonly','閲覧専用'],['maint','メンテナンス中']];
+    b.innerHTML=`<div class="days" style="flex-wrap:wrap">${M.map(([k,t])=>`<button type="button" data-md="${k}" aria-pressed="${S.mode===k}">${t}</button>`).join('')}</div>
+    <label for="amsg">メンテナンス中に表示するメッセージ（任意）</label><input id="amsg" maxlength="60" value="${esc(S.mmsg||'')}" placeholder="例：22時まで更新中です">
+    <div class="acts"><button type="button" data-act="chpw">パスコード変更</button><button type="button" data-act="out">管理者を解除</button></div>`;
+  }
+}
+function openAdmin(){renderAdmin();$('dlgA').showModal();if(document.activeElement&&document.activeElement!==$('dlgA'))document.activeElement.blur()}
+$('adm').onclick=openAdmin;$('madm').onclick=openAdmin;$('aclose').onclick=()=>$('dlgA').close();
+$('abody').onclick=async e=>{
+  const t=e.target.closest('[data-act],[data-md]');if(!t)return;const a=t.dataset.act;
+  if(a==='set'){const p=$('apw').value;if(p.length<4)return alert('4文字以上で入力してください。');setMeta({pw:await hashPw(p)});setAdm(true)}
+  else if(a==='unlock'){if(await hashPw($('apw').value)!==S.pw)return alert('パスコードが違います。');setAdm(true)}
+  else if(a==='out')setAdm(false);
+  else if(a==='chpw'){const p=prompt('新しいパスコード（4文字以上）');if(!p||p.length<4)return;setMeta({pw:await hashPw(p)});alert('変更しました。')}
+  else if(t.dataset.md)setMeta({mode:t.dataset.md,mmsg:(($('amsg')||{}).value||'').trim()});
+  applyMode();renderAdmin();
+};
 let wishF='all',editW=null;
 const wDay=w=>{const d=w.day;return(d===undefined||d===''||d===null||+d>=S.days)?'u':String(+d)};
 const wishOpts=()=>'<option value="">日にち未定</option>'+Array.from({length:S.days},(_,i)=>`<option value="${i}">${i+1}日目 ${dayLabel(i)}</option>`).join('');
@@ -418,6 +470,7 @@ function renderWish(){
   $('wishList').innerHTML=html||`<div class="empty">${S.wish.length?'この日の候補はまだありません。':'行きたい場所の候補はまだありません。<br>思いついたらここにためておいて、<br>決まったら予定に入れましょう。'}</div>`;
 }
 function openWish(id){
+  if(RO())return;
   const w=S.wish.find(i=>i.id===id);if(!w)return;editW=id;
   $('wday').innerHTML=wishOpts();$('wday').value=wDay(w)==='u'?'':wDay(w);
   $('wt').value=w.title||'';$('wp').value=w.place||'';$('wn').value=w.note||'';
@@ -428,7 +481,7 @@ $('fw').onsubmit=()=>{const w=S.wish.find(i=>i.id===editW);if(!w)return;
   w.title=$('wt').value.trim()||w.title;w.place=$('wp').value.trim();w.note=$('wn').value.trim();w.day=$('wday').value===''?'':+$('wday').value;
   putWish(w);renderWish()};
 $('wishTabs').onclick=e=>{const b=e.target.closest('button');if(!b)return;wishF=b.dataset.wf;$('wishDay').value=/^\d+$/.test(wishF)?wishF:'';renderWish()};
-function all(){head();renderDays();renderList();renderPack();renderWish();renderCost()}
+function all(){head();renderDays();renderList();renderPack();renderWish();renderCost();applyMode()}
 
 // events
 $('title').oninput=e=>{S.title=e.target.value;syncMeta()};
@@ -450,6 +503,7 @@ $('list').onclick=e=>{
   else if(ed)openDlg(ed.dataset.e);
 };
 function openDlg(id){
+  if(RO())return;
   editId=id||null;const it=id?S.items.find(i=>i.id===id):{};
   $('dh').textContent=id?'予定を編集':`${cur+1}日目の予定を追加`;
   $('ftime').value=it.time||'';$('fcost').value=it.cost||'';$('ftitle').value=it.title||'';$('fplace').value=it.place||'';$('fnote').value=it.note||'';$('o0').textContent=S.names[0];$('o1').textContent=S.names[1];$('fpay').value=it.pay||'';$('fcat').value=it.cat||'';$('fday').innerHTML=Array.from({length:S.days},(_,i)=>`<option value="${i}">${i+1}日目 ${dayLabel(i)}</option>`).join('');$('fday').value=String(it.day!==undefined?it.day:cur);editPh=[...(it.photos||[])];renderPh();
@@ -497,7 +551,7 @@ all();
   db=shim;
   setSync();
   db.doc('trip/meta').onSnapshot(s=>{
-    if(s.exists){const d=s.data();S.title=d.title??S.title;S.start=d.start||'';S.days=d.days||S.days;if(d.names)S.names=d.names;S.dest=d.dest||'';if(!didAuto&&S.start){didAuto=true;const t0=new Date();t0.setHours(0,0,0,0);const k=Math.round((t0-new Date(S.start+'T00:00:00'))/864e5);if(k>=0&&k<S.days)cur=k}
+    if(s.exists){const d=s.data();S.title=d.title??S.title;S.start=d.start||'';S.days=d.days||S.days;if(d.names)S.names=d.names;S.dest=d.dest||'';S.mode=d.mode||'normal';S.mmsg=d.mmsg||'';S.pw=d.pw||'';if(!didAuto&&S.start){didAuto=true;const t0=new Date();t0.setHours(0,0,0,0);const k=Math.round((t0-new Date(S.start+'T00:00:00'))/864e5);if(k>=0&&k<S.days)cur=k}
       if(cur>=S.days)cur=S.days-1;all();loadWeather()}
     else{db.doc('trip/meta').set({title:S.title,start:S.start,days:S.days,names:S.names,dest:S.dest||''}).catch(ig);
       }
