@@ -195,6 +195,7 @@ dialog:focus{outline:none}
     </div>
     <label for="fcat">種類</label><select id="fcat"><option value="">おまかせ（自動）</option><option value="plane">✈️ 飛行機</option><option value="train">🚆 電車</option><option value="bus">🚌 バス</option><option value="food">🍜 食事</option><option value="sight">⛩️ 観光</option><option value="stay">🏨 宿泊</option><option value="other">📌 その他</option></select>
     <label for="fpay">支払った人（精算に使います）</label><select id="fpay"><option value="">未設定（精算に含めない）</option><option value="0" id="o0"></option><option value="1" id="o1"></option></select>
+    <label for="ftgt">精算の対象（誰のための費用か）</label><select id="ftgt"><option value="">ふたりで折半</option><option value="0" id="t0"></option><option value="1" id="t1"></option></select>
     <label for="ftitle">やること</label><input id="ftitle" required maxlength="60" placeholder="例：清水寺を散歩">
     <label for="fplace">場所</label><input id="fplace" maxlength="80" placeholder="例：京都市東山区">
     <label for="fnote">メモ</label><textarea id="fnote" rows="2" maxlength="200" placeholder="予約番号、持っていくものなど"></textarea>
@@ -280,7 +281,7 @@ function renderList(){
       ${x.place?`<div class="sub"><a class="map" target="_blank" rel="noopener" href="https://maps.apple.com/?q=${encodeURIComponent(x.place)}">📍 ${esc(x.place)}</a></div>`:''}
       ${x.note?`<div class="sub">${esc(x.note)}</div>`:''}
       ${x.photos&&x.photos.length?`<div class="thumbs">${x.photos.map((p,i)=>`<img src="${p}" data-pv="${x.id}:${i}" alt="写真">`).join('')}</div>`:''}
-      ${x.cost?`<span class="cost">${yen(x.cost)}${x.pay==='0'||x.pay==='1'?'（'+esc(S.names[+x.pay])+'）':''}</span>`:''}
+      ${x.cost?`<span class="cost">${yen(x.cost)}${x.pay==='0'||x.pay==='1'?'（'+esc(S.names[+x.pay])+(x.tgt==='0'||x.tgt==='1'?'・'+esc(S.names[+x.tgt])+'分':'')+'）':''}</span>`:''}
       <div class="racts"><button class="mini" data-ca="${x.id}">📅 カレンダーに追加</button>${x.place?`<a class="mini rt" target="_blank" rel="noopener" href="https://maps.apple.com/?daddr=${encodeURIComponent(x.place)}&dirflg=${RM}">現在地から</a>`:''}${x.place&&nxt?`<a class="mini rt" target="_blank" rel="noopener" href="https://maps.apple.com/?saddr=${encodeURIComponent(x.place)}&daddr=${encodeURIComponent(nxt.place)}&dirflg=${RM}">次へ：${esc(nxt.title)}</a>`:''}</div>
     </div>
     <div class="side"><input type="checkbox" class="chk" data-c="${x.id}" ${x.done?'checked':''} aria-label="完了"><button class="del" data-x="${x.id}" aria-label="削除">×</button></div>
@@ -306,20 +307,31 @@ function renderCost(){
   const N=S.names,c=x=>+x.cost||0;
   const tot=S.items.reduce((a,x)=>a+c(x),0);
   const per=Array.from({length:S.days},(_,i)=>S.items.filter(x=>x.day===i).reduce((a,x)=>a+c(x),0));
-  const paid=[0,0];let asg=0,unset=0;
-  S.items.forEach(x=>{if(x.pay==='0'||x.pay==='1'){paid[+x.pay]+=c(x);asg+=c(x)}else unset+=c(x)});
-  const diff=paid[0]-asg/2;
-  const res=asg===0?'「支払った人」を入れると、精算額が出ます':Math.abs(diff)<1?'精算なし（ちょうど折半です）':`${esc(diff>0?N[1]:N[0])} → ${esc(diff>0?N[0]:N[1])} に <b>${yen(Math.abs(diff))}</b>`;
+  const paid=[0,0],owed=[0,0],claim=[[0,0],[0,0]];let asg=0,unset=0;
+  S.items.forEach(x=>{const v=c(x);if(!v)return;
+    if(x.pay!=='0'&&x.pay!=='1'){unset+=v;return}
+    const p=+x.pay,sh=x.tgt==='0'?[v,0]:x.tgt==='1'?[0,v]:[v/2,v/2];
+    paid[p]+=v;asg+=v;owed[0]+=sh[0];owed[1]+=sh[1];claim[p][1-p]+=sh[1-p];
+  });
+  const c01=claim[0][1],c10=claim[1][0],net=c01-c10;
+  const from=net>0?1:0,to=1-from;
+  const res=asg===0?'「支払った人」を入れると、精算額が出ます':Math.abs(net)<1?'精算なし（貸し借りなし）':`${esc(N[from])} → ${esc(N[to])} に <b>${yen(Math.abs(net))}</b>`;
+  const off=asg>0&&(c01>0||c10>0)?`<div class="line"><span>${esc(N[0])}が${esc(N[1])}に請求できる額</span><span>${yen(c01)}</span></div>
+  <div class="line"><span>${esc(N[1])}が${esc(N[0])}に請求できる額</span><span>${yen(c10)}</span></div>
+  <div class="line"><span>差し引き（多い側から消し込み）</span><span><b>${yen(Math.abs(net))}</b></span></div>`:'';
   $('cost').innerHTML=`<div class="sum"><div class="sub">合計</div><div class="big">${yen(tot)}</div>
   <div class="sub">ひとりあたり ${yen(tot/2)}</div></div>
-  <div class="sum"><div style="font-weight:700;margin-bottom:4px">精算（折半）</div>
+  <div class="sum"><div style="font-weight:700;margin-bottom:4px">精算</div>
   <div class="big" style="font-size:20px;margin:6px 0">${res}</div>
-  <div class="line"><span>${esc(N[0])}が払った</span><span>${yen(paid[0])}</span></div>
-  <div class="line"><span>${esc(N[1])}が払った</span><span>${yen(paid[1])}</span></div>
-  ${unset>0?`<div class="line"><span>支払った人が未設定</span><span>${yen(unset)}</span></div>`:''}
+  ${off}
+  <div style="font-weight:700;margin:14px 0 2px;font-size:14px">立て替えと負担</div>
+  <div class="line"><span>${esc(N[0])}：払った / 負担</span><span>${yen(paid[0])} / ${yen(owed[0])}</span></div>
+  <div class="line"><span>${esc(N[1])}：払った / 負担</span><span>${yen(paid[1])} / ${yen(owed[1])}</span></div>
+  ${unset>0?`<div class="line"><span>支払った人が未設定（精算外）</span><span>${yen(unset)}</span></div>`:''}
   <div class="meta" style="margin-top:10px"><label style="margin:0">名前 <input data-n="0" value="${esc(N[0])}" maxlength="10" style="width:90px"></label><label style="margin:0"><input data-n="1" value="${esc(N[1])}" maxlength="10" style="width:90px"></label></div></div>
   <div class="sum"><div style="font-weight:700;margin-bottom:4px">日ごとの費用</div>${per.map((v,i)=>`<div class="line"><span>${i+1}日目 ${dayLabel(i)}</span><span>${yen(v)}</span></div>`).join('')}</div>`;
 }
+
 const TL='futari-trips';
 let trips=[];try{trips=JSON.parse(localStorage.getItem(TL)||'[]')}catch(e){}
 if(!Array.isArray(trips))trips=[];
@@ -511,13 +523,13 @@ function openDlg(id){
   if(RO())return;
   editId=id||null;const it=id?S.items.find(i=>i.id===id):{};
   $('dh').textContent=id?'予定を編集':`${cur+1}日目の予定を追加`;
-  $('ftime').value=it.time||'';$('fcost').value=it.cost||'';$('ftitle').value=it.title||'';$('fplace').value=it.place||'';$('fnote').value=it.note||'';$('o0').textContent=S.names[0];$('o1').textContent=S.names[1];$('fpay').value=it.pay||'';$('fcat').value=it.cat||'';$('fday').innerHTML=Array.from({length:S.days},(_,i)=>`<option value="${i}">${i+1}日目 ${dayLabel(i)}</option>`).join('');$('fday').value=String(it.day!==undefined?it.day:cur);editPh=[...(it.photos||[])];renderPh();
+  $('ftime').value=it.time||'';$('fcost').value=it.cost||'';$('ftitle').value=it.title||'';$('fplace').value=it.place||'';$('fnote').value=it.note||'';$('o0').textContent=S.names[0];$('o1').textContent=S.names[1];$('t0').textContent=S.names[0]+'のみ';$('t1').textContent=S.names[1]+'のみ';$('ftgt').value=it.tgt||'';$('fpay').value=it.pay||'';$('fcat').value=it.cat||'';$('fday').innerHTML=Array.from({length:S.days},(_,i)=>`<option value="${i}">${i+1}日目 ${dayLabel(i)}</option>`).join('');$('fday').value=String(it.day!==undefined?it.day:cur);editPh=[...(it.photos||[])];renderPh();
   $('dlg').showModal();if(document.activeElement&&document.activeElement!==$('dlg'))document.activeElement.blur();
 }
 $('fab').onclick=()=>openDlg();
 $('cancel').onclick=()=>$('dlg').close();
 $('f').onsubmit=e=>{
-  const v={time:$('ftime').value,cost:+$('fcost').value||0,title:$('ftitle').value.trim(),place:$('fplace').value.trim(),note:$('fnote').value.trim(),pay:$('fpay').value,cat:$('fcat').value,day:+$('fday').value,photos:editPh.slice()};
+  const v={time:$('ftime').value,cost:+$('fcost').value||0,title:$('ftitle').value.trim(),place:$('fplace').value.trim(),note:$('fnote').value.trim(),pay:$('fpay').value,tgt:$('ftgt').value,cat:$('fcat').value,day:+$('fday').value,photos:editPh.slice()};
   if(!v.title)return;
   let it;if(editId){it=S.items.find(i=>i.id===editId);Object.assign(it,v)}else{it={id:uid(),day:cur,done:false,...v};S.items.push(it)}
   cur=it.day;renderDays();putItem(it);renderList();renderCost();
