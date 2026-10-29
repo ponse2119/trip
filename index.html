@@ -47,6 +47,24 @@ body.ro .chk,body.ro #title,body.ro .meta input,body.ro #cost input,body.ro [dat
 body.ro .tk .body,body.ro .item .body{cursor:default}
 .racts{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
 .rt{display:inline-block;text-decoration:none;color:var(--ink);max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.exr{display:flex;gap:10px;justify-content:space-between;padding:12px 0;border-top:1px solid var(--line);cursor:pointer}
+.exr .ext{font-weight:700;font-size:16px}
+.exr .pen{color:var(--sub);font-size:14px}
+.exr .exs{color:var(--sub);font-size:13px}
+.exr .exa{font-weight:700;font-size:17px;white-space:nowrap}
+.exr.st{opacity:.55}.exr.st .ext{text-decoration:line-through}
+.chips{display:flex;margin-top:6px;flex-wrap:wrap;padding-left:4px}
+.chip{width:26px;height:26px;border-radius:50%;border:1.5px solid var(--line);display:inline-flex;align-items:center;justify-content:center;font-size:12px;color:var(--sub);margin-left:-4px;background:var(--card)}
+.chip.on{border-color:color-mix(in srgb,var(--ac) 55%,#fff);color:var(--ink);background:color-mix(in srgb,var(--ac) 10%,#fff)}
+.stb{display:inline-block;background:var(--line);color:var(--sub);border-radius:8px;padding:0 8px;font-size:12px;font-weight:700;margin-left:6px}
+.warn{color:var(--ac)}
+.ok{color:#1b6b45;font-weight:700}
+.cost.st{opacity:.6}
+.mrow{display:flex;gap:8px;align-items:center;margin-bottom:8px}
+.mrow input{flex:1;min-width:0;border:1px solid var(--line);background:var(--bg);border-radius:10px;padding:8px 10px;font-size:16px}
+.item select.mini{max-width:112px}
+body.ro #cost button{display:none}
+body.ro .exr{pointer-events:none}
 .gh{font:700 16px "Shippori Mincho B1","Hiragino Mincho ProN",serif;margin:18px 0 8px;padding-left:10px;border-left:4px solid var(--ac)}
 .nx{display:inline-block;background:var(--ac);color:var(--acink);border-radius:8px;padding:0 8px;font-size:12px;font-weight:700;margin-bottom:4px}
 .tk.next{border-color:var(--ac);box-shadow:0 0 0 2px var(--ac)}
@@ -97,7 +115,7 @@ dialog:focus{outline:none}
 .acts .pri{background:var(--ac);color:var(--acink);border-color:var(--ac)}
 .sum{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px;margin-bottom:12px}
 .big{font-size:30px;font-weight:700}
-.line{display:flex;justify-content:space-between;padding:6px 0;border-top:1px solid var(--line);font-size:15px}
+.line{display:flex;flex-wrap:wrap;gap:6px;align-items:center;justify-content:space-between;padding:6px 0;border-top:1px solid var(--line);font-size:15px}
 .add{display:flex;gap:8px;margin-bottom:12px}
 .add input{flex:1;min-width:0;border:1px solid var(--line);background:var(--card);border-radius:12px;padding:10px;font-size:16px}
 .add button{border:0;background:var(--ac);color:var(--acink);border-radius:12px;padding:0 18px;font-weight:700;cursor:pointer}
@@ -180,7 +198,7 @@ dialog:focus{outline:none}
 <dialog id="dlgT" autofocus tabindex="-1">
   <h2>旅の一覧</h2>
   <div id="tlist"></div>
-  <div class="acts"><button type="button" id="tclose">閉じる</button><button type="button" class="pri" id="tnew">＋ 新しい旅</button></div>
+  <div class="acts"><button type="button" id="tclose">閉じる</button><button type="button" id="tfnew">＋ フォルダ</button><button type="button" class="pri" id="tnew">＋ 新しい旅</button></div>
 </dialog>
 
 <dialog id="dlgP" autofocus tabindex="-1" style="padding:10px"><img id="pimg" alt="写真" style="width:100%;max-height:80vh;object-fit:contain;border-radius:12px;display:block"><div class="acts"><button type="button" id="pclose">閉じる</button></div></dialog>
@@ -194,8 +212,8 @@ dialog:focus{outline:none}
       <div><label for="fcost">費用（円）</label><input type="number" id="fcost" inputmode="numeric" min="0" placeholder="0"></div>
     </div>
     <label for="fcat">種類</label><select id="fcat"><option value="">おまかせ（自動）</option><option value="plane">✈️ 飛行機</option><option value="train">🚆 電車</option><option value="bus">🚌 バス</option><option value="food">🍜 食事</option><option value="sight">⛩️ 観光</option><option value="stay">🏨 宿泊</option><option value="other">📌 その他</option></select>
-    <label for="fpay">支払った人（精算に使います）</label><select id="fpay"><option value="">未設定（精算に含めない）</option><option value="0" id="o0"></option><option value="1" id="o1"></option></select>
-    <label for="ftgt">精算の対象（誰のための費用か）</label><select id="ftgt"><option value="">ふたりで折半</option><option value="0" id="t0"></option><option value="1" id="t1"></option></select>
+    <label for="fpay">支払った人（精算に使います）</label><select id="fpay"></select>
+    <label>精算の対象（誰のための費用か）</label><div class="days" id="fshare" style="flex-wrap:wrap"></div>
     <label for="ftitle">やること</label><input id="ftitle" required maxlength="60" placeholder="例：清水寺を散歩">
     <label for="fplace">場所</label><input id="fplace" maxlength="80" placeholder="例：京都市東山区">
     <label for="fnote">メモ</label><textarea id="fnote" rows="2" maxlength="200" placeholder="予約番号、持っていくものなど"></textarea>
@@ -223,16 +241,18 @@ const shim={
   collection:c=>{const cr=collection(fs,'trips',TID,c);return{doc:id=>{const r=doc(fs,'trips',TID,c,id);return{set:d=>setDoc(r,d),delete:()=>deleteDoc(r)}},onSnapshot:n=>onSnapshot(cr,q=>n({docs:q.docs.map(d=>({data:()=>d.data()}))}),bad)}}
 };
 const KEY='futari-trip-v1';
-let S={title:'ふたりの旅',start:'',days:3,names:['自分','彼女'],dest:'',mode:'normal',mmsg:'',pw:'',items:[],pack:[],wish:[]};
+let S={title:'ふたりの旅',start:'',days:3,members:[{id:'0',name:'自分'},{id:'1',name:'彼女'}],settle:[],dest:'',mode:'normal',mmsg:'',pw:'',items:[],pack:[],wish:[]};
 try{const r=localStorage.getItem(KEY);if(r)S=Object.assign(S,JSON.parse(r))}catch(e){}
 let cur=0,editId=null;
 const $=id=>document.getElementById(id);
 const save=()=>{try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}};
 let db=null,mt;const ig=()=>{};
-const syncMeta=()=>{if(RO())return;if(!db)return save();clearTimeout(mt);mt=setTimeout(()=>db.doc('trip/meta').set({title:S.title,start:S.start,days:S.days,names:S.names,dest:S.dest||''}).catch(ig),400)};
+const syncMeta=()=>{if(RO())return;if(!db)return save();clearTimeout(mt);mt=setTimeout(()=>db.doc('trip/meta').set({title:S.title,start:S.start,days:S.days,members:S.members,names:S.members.map(m=>m.name),dest:S.dest||''}).catch(ig),400)};
 const putItem=it=>{if(RO())return;if(!db)return save();db.collection('items').doc(it.id).set(it).catch(ig)};
 const rmItem=id=>{if(RO())return;if(!db)return save();db.collection('items').doc(id).delete().catch(ig)};
 const putPack=p=>{if(RO())return;if(!db)return save();db.collection('pack').doc(p.id).set(p).catch(ig)};
+const putSettle=r=>{if(RO())return;if(!db)return save();db.collection('settle').doc(r.id).set(r).catch(ig)};
+const rmSettle=id=>{if(RO())return;if(!db)return save();db.collection('settle').doc(id).delete().catch(ig)};
 const putWish=w=>{if(RO())return;if(!db)return save();db.collection('wish').doc(w.id).set(w).catch(ig)};
 const rmWish=id=>{if(RO())return;if(!db)return save();db.collection('wish').doc(id).delete().catch(ig)};
 const rmPack=id=>{if(RO())return;if(!db)return save();db.collection('pack').doc(id).delete().catch(ig)};
@@ -281,77 +301,115 @@ function renderList(){
       ${x.place?`<div class="sub"><a class="map" target="_blank" rel="noopener" href="https://maps.apple.com/?q=${encodeURIComponent(x.place)}">📍 ${esc(x.place)}</a></div>`:''}
       ${x.note?`<div class="sub">${esc(x.note)}</div>`:''}
       ${x.photos&&x.photos.length?`<div class="thumbs">${x.photos.map((p,i)=>`<img src="${p}" data-pv="${x.id}:${i}" alt="写真">`).join('')}</div>`:''}
-      ${x.cost?`<span class="cost">${yen(x.cost)}${x.pay==='0'||x.pay==='1'?'（'+esc(S.names[+x.pay])+(x.tgt==='0'||x.tgt==='1'?'・'+esc(S.names[+x.tgt])+'分':'')+'）':''}</span>`:''}
+      ${x.cost?`<span class="cost ${x.settled?'st':''}">${yen(x.cost)}${S.members.some(m=>m.id===x.pay)?'（'+esc(mName(x.pay))+'）':''}${x.settled?' 精算済み':''}</span>`:''}
       <div class="racts"><button class="mini" data-ca="${x.id}">📅 カレンダーに追加</button>${x.place?`<a class="mini rt" target="_blank" rel="noopener" href="https://maps.apple.com/?daddr=${encodeURIComponent(x.place)}&dirflg=${RM}">現在地から</a>`:''}${x.place&&nxt?`<a class="mini rt" target="_blank" rel="noopener" href="https://maps.apple.com/?saddr=${encodeURIComponent(x.place)}&daddr=${encodeURIComponent(nxt.place)}&dirflg=${RM}">次へ：${esc(nxt.title)}</a>`:''}</div>
     </div>
     <div class="side"><input type="checkbox" class="chk" data-c="${x.id}" ${x.done?'checked':''} aria-label="完了"><button class="del" data-x="${x.id}" aria-label="削除">×</button></div>
   </div>`}).join(''):`<div class="empty">この日の予定はまだありません。<br>「＋ 予定を追加」から入れてみましょう。</div>`;
 }
+const mName=id=>{const m=S.members.find(m=>m.id===id);return m?m.name:'?'};
+const mIds=()=>S.members.map(m=>m.id);
+const shareIds=x=>{const ids=mIds();if(x.tg&&x.tg.length){const g=x.tg.filter(i=>ids.includes(i));if(g.length)return g}if((x.tgt==='0'||x.tgt==='1')&&ids.includes(x.tgt))return[x.tgt];return ids};
+const packOwn=p=>(p.o===undefined||p.o===''||!mIds().includes(p.o))?'share':p.o;
 let packF='all';
 function renderPack(){
-  const N=S.names,lab=['自分用','彼女用','共用'].map((t,i)=>i<2?N[i]+'用':t);
-  [0,1,2].forEach(i=>{$('packOwner').options[i].textContent=lab[i]});
-  const own=p=>p.o===undefined||p.o===''?'2':String(p.o);
-  const cnt=k=>S.pack.filter(p=>k==='all'||own(p)===k).length;
-  $('packTabs').innerHTML=[['all','すべて'],['0',lab[0]],['1',lab[1]],['2','共用']].map(([k,t])=>`<button data-pf="${k}" aria-pressed="${packF===k}">${esc(t)}<small>${cnt(k)}件</small></button>`).join('');
-  const L=S.pack.filter(p=>packF==='all'||own(p)===packF);
+  const ids=mIds(),lab=id=>id==='share'?'共用':mName(id)+'用';
+  const keep=$('packOwner').value;
+  $('packOwner').innerHTML=ids.map(i=>`<option value="${esc(i)}">${esc(lab(i))}</option>`).join('')+'<option value="share">共用</option>';
+  $('packOwner').value=[...ids,'share'].includes(keep)?keep:'share';
+  const cnt=k=>S.pack.filter(p=>k==='all'||packOwn(p)===k).length;
+  const tabs=[['all','すべて'],...ids.map(i=>[i,lab(i)]),['share','共用']];
+  if(!tabs.some(t=>t[0]===packF))packF='all';
+  $('packTabs').innerHTML=tabs.map(([k,t])=>`<button data-pf="${esc(k)}" aria-pressed="${packF===k}">${esc(t)}<small>${cnt(k)}件</small></button>`).join('');
+  const L=S.pack.filter(p=>packF==='all'||packOwn(p)===packF);
   $('packList').innerHTML=L.length?L.map(p=>`
   <div class="item ${p.done?'done':''}" style="align-items:center">
     <input type="checkbox" class="chk" data-pc="${p.id}" ${p.done?'checked':''} aria-label="準備OK">
     <div class="body t">${esc(p.t)}</div>
-    <button class="mini" data-po="${p.id}" aria-label="持ち主を変える">${esc(lab[+own(p)])}</button>
+    <button class="mini" data-po="${p.id}" aria-label="持ち主を変える">${esc(lab(packOwn(p)))}</button>
     <button class="del" data-px="${p.id}" aria-label="削除">×</button>
   </div>`).join(''):`<div class="empty">${S.pack.length?'この分類の持ち物はありません。':'持ち物リストは空です。<br>充電器やパスポートなど、忘れ物防止に。'}</div>`;
 }
-function renderCost(){
-  const N=S.names,c=x=>+x.cost||0;
-  const tot=S.items.reduce((a,x)=>a+c(x),0);
-  const per=Array.from({length:S.days},(_,i)=>S.items.filter(x=>x.day===i).reduce((a,x)=>a+c(x),0));
-  const paid=[0,0],owed=[0,0],claim=[[0,0],[0,0]];let asg=0,unset=0;
-  S.items.forEach(x=>{const v=c(x);if(!v)return;
-    if(x.pay!=='0'&&x.pay!=='1'){unset+=v;return}
-    const p=+x.pay,sh=x.tgt==='0'?[v,0]:x.tgt==='1'?[0,v]:[v/2,v/2];
-    paid[p]+=v;asg+=v;owed[0]+=sh[0];owed[1]+=sh[1];claim[p][1-p]+=sh[1-p];
+function calc(){
+  const ids=mIds(),paidAll={},bal={};ids.forEach(i=>{paidAll[i]=0;bal[i]=0});
+  let unset=0,asg=0;
+  S.items.forEach(x=>{const v=+x.cost||0;if(!v)return;
+    if(!ids.includes(x.pay)){unset+=v;return}
+    paidAll[x.pay]+=v;
+    if(x.settled)return;
+    const sh=shareIds(x),k=sh.length,base=Math.floor(v/k),r=v-base*k;
+    bal[x.pay]+=v;asg+=v;
+    sh.forEach((id,j)=>{bal[id]-=base+(j<r?1:0)});
   });
-  const c01=claim[0][1],c10=claim[1][0],net=c01-c10;
-  const from=net>0?1:0,to=1-from;
-  const res=asg===0?'「支払った人」を入れると、精算額が出ます':Math.abs(net)<1?'精算なし（貸し借りなし）':`${esc(N[from])} → ${esc(N[to])} に <b>${yen(Math.abs(net))}</b>`;
-  const off=asg>0&&(c01>0||c10>0)?`<div class="line"><span>${esc(N[0])}が${esc(N[1])}に請求できる額</span><span>${yen(c01)}</span></div>
-  <div class="line"><span>${esc(N[1])}が${esc(N[0])}に請求できる額</span><span>${yen(c10)}</span></div>
-  <div class="line"><span>差し引き（多い側から消し込み）</span><span><b>${yen(Math.abs(net))}</b></span></div>`:'';
+  S.settle.filter(r=>!r.done).forEach(r=>{if(r.from in bal)bal[r.from]+=r.amount;if(r.to in bal)bal[r.to]-=r.amount});
+  const deb=ids.filter(i=>bal[i]<0).map(i=>({id:i,a:-bal[i]})).sort((a,b)=>b.a-a.a);
+  const cre=ids.filter(i=>bal[i]>0).map(i=>({id:i,a:bal[i]})).sort((a,b)=>b.a-a.a);
+  const plan=[];let i=0,j=0;
+  while(i<deb.length&&j<cre.length){const t=Math.min(deb[i].a,cre[j].a);if(t>0)plan.push({from:deb[i].id,to:cre[j].id,a:t});deb[i].a-=t;cre[j].a-=t;if(deb[i].a<=0)i++;if(cre[j].a<=0)j++}
+  return{paidAll,bal,plan,asg,unset};
+}
+function renderCost(){
+  const ids=mIds(),c=calc(),n=S.members.length;
+  const tot=S.items.reduce((a,x)=>a+(+x.cost||0),0);
+  const per=Array.from({length:S.days},(_,i)=>S.items.filter(x=>x.day===i).reduce((a,x)=>a+(+x.cost||0),0));
+  const recs=S.settle.filter(r=>!r.done),dones=S.settle.filter(r=>r.done);
+  const anySettled=dones.length>0||S.items.some(x=>x.settled);
+  const sr=r=>`${esc(mName(r.from))}は${esc(mName(r.to))}に${yen(r.amount)} 精算済み`;
+  let st;
+  if(c.plan.length)st=c.plan.map(p=>`<div class="line"><span>${esc(mName(p.from))} → ${esc(mName(p.to))}</span><span><b>${yen(p.a)}</b> <button class="mini" data-pay="${esc(p.from)}|${esc(p.to)}|${p.a}">精算済みにする</button></span></div>`).join('');
+  else if(S.settle.length)st='<div class="ok" style="padding:6px 0">すべて精算済みです</div>';
+  else st=c.asg===0?'<div class="sub">「支払った人」を入れると、精算額が出ます</div>':'<div class="sub">精算なし（貸し借りなし）</div>';
+  const recHtml=recs.map(r=>`<div class="line"><span class="ok">${sr(r)}</span><button class="mini" data-rmset="${r.id}">取り消し</button></div>`).join('')+dones.map(r=>`<div class="line"><span class="ok">${sr(r)}</span></div>`).join('');
+  const ex=S.items.filter(x=>+x.cost>0).sort((a,b)=>a.day-b.day||(a.time||'99:99').localeCompare(b.time||'99:99'));
+  const dtxt=x=>{const d=dayDate(x.day);return d?`${d.getMonth()+1}/${d.getDate()}`:`${x.day+1}日目`};
+  const exRows=ex.map(x=>{const ok=ids.includes(x.pay),sh=shareIds(x);return `<div class="exr ${x.settled?'st':''}" data-xe="${x.id}"><div><div class="ext">${esc(x.title)} <span class="pen">✎</span>${x.settled?'<span class="stb">精算済み</span>':''}</div><div class="exs ${ok?'':'warn'}">${ok?esc(mName(x.pay))+'が立て替え':'支払った人が未設定'} (${dtxt(x)})</div><div class="chips">${S.members.map(m=>`<span class="chip ${sh.includes(m.id)?'on':''}">${esc([...m.name][0]||'?')}</span>`).join('')}</div></div><div class="exa">${yen(x.cost)}</div></div>`}).join('');
   $('cost').innerHTML=`<div class="sum"><div class="sub">合計</div><div class="big">${yen(tot)}</div>
-  <div class="sub">ひとりあたり ${yen(tot/2)}</div></div>
-  <div class="sum"><div style="font-weight:700;margin-bottom:4px">精算</div>
-  <div class="big" style="font-size:20px;margin:6px 0">${res}</div>
-  ${off}
-  <div style="font-weight:700;margin:14px 0 2px;font-size:14px">立て替えと負担</div>
-  <div class="line"><span>${esc(N[0])}：払った / 負担</span><span>${yen(paid[0])} / ${yen(owed[0])}</span></div>
-  <div class="line"><span>${esc(N[1])}：払った / 負担</span><span>${yen(paid[1])} / ${yen(owed[1])}</span></div>
-  ${unset>0?`<div class="line"><span>支払った人が未設定（精算外）</span><span>${yen(unset)}</span></div>`:''}
-  <div class="meta" style="margin-top:10px"><label style="margin:0">名前 <input data-n="0" value="${esc(N[0])}" maxlength="10" style="width:90px"></label><label style="margin:0"><input data-n="1" value="${esc(N[1])}" maxlength="10" style="width:90px"></label></div></div>
-  <div class="sum"><div style="font-weight:700;margin-bottom:4px">日ごとの費用</div>${per.map((v,i)=>`<div class="line"><span>${i+1}日目 ${dayLabel(i)}</span><span>${yen(v)}</span></div>`).join('')}</div>`;
+  <div class="sub">ひとりあたり ${yen(tot/n)}（${n}人で割った場合）</div></div>
+  <div class="sum"><div style="font-weight:700;margin-bottom:6px">精算</div>${st}${recHtml}
+  ${anySettled?'<div style="margin-top:10px"><button class="mini" data-redo>精算済みを元に戻す</button></div>':''}
+  <div style="font-weight:700;margin:14px 0 2px;font-size:14px">立て替え</div>
+  ${ids.map(i=>`<div class="line"><span>${esc(mName(i))}が払った</span><span>${yen(c.paidAll[i])}</span></div>`).join('')}
+  ${c.unset>0?`<div class="line"><span>支払った人が未設定（精算外）</span><span>${yen(c.unset)}</span></div>`:''}</div>
+  <div class="sum"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px"><div style="font-weight:700">みんなの立て替え</div><button class="mini" data-addx>＋ 費用を追加</button></div>${exRows||'<div class="sub" style="padding:8px 0">費用が入った予定が、ここに並びます。</div>'}</div>
+  <div class="sum"><div style="font-weight:700;margin-bottom:4px">日ごとの費用</div>${per.map((v,i)=>`<div class="line"><span>${i+1}日目 ${dayLabel(i)}</span><span>${yen(v)}</span></div>`).join('')}</div>
+  <div class="sum"><div style="font-weight:700;margin-bottom:8px">メンバー（${n}人）</div>${S.members.map(m=>`<div class="mrow"><input data-mn="${esc(m.id)}" value="${esc(m.name)}" maxlength="10" aria-label="名前">${n>2?`<button class="del" data-mr="${esc(m.id)}" aria-label="削除">×</button>`:''}</div>`).join('')}<button class="mini" data-ma>＋ メンバーを追加</button></div>`;
 }
 
-const TL='futari-trips';
+const TL='futari-trips',FL='futari-folders';
 let trips=[];try{trips=JSON.parse(localStorage.getItem(TL)||'[]')}catch(e){}
 if(!Array.isArray(trips))trips=[];
-const saveTrips=()=>{try{localStorage.setItem(TL,JSON.stringify(trips))}catch(e){}};
+let folders=[];try{folders=JSON.parse(localStorage.getItem(FL)||'[]')}catch(e){}
+if(!Array.isArray(folders))folders=[];
+const saveTrips=()=>{try{localStorage.setItem(TL,JSON.stringify(trips));localStorage.setItem(FL,JSON.stringify(folders))}catch(e){}};
 let ent=trips.find(t=>t.id===TID);
-if(!ent){ent={id:TID,name:S.title||'ふたりの旅'};trips.push(ent);saveTrips()}
-Object.assign(S,{title:ent.name||'ふたりの旅',start:'',days:3,names:['自分','彼女'],dest:'',mode:'normal',mmsg:'',pw:'',items:[],pack:[],wish:[]});
+if(!ent){ent={id:TID,name:S.title||'ふたりの旅',folder:''};trips.push(ent);saveTrips()}
+Object.assign(S,{title:ent.name||'ふたりの旅',start:'',days:3,members:[{id:'0',name:'自分'},{id:'1',name:'彼女'}],settle:[],dest:'',mode:'normal',mmsg:'',pw:'',items:[],pack:[],wish:[]});
 const newId=()=>Array.from(crypto.getRandomValues(new Uint8Array(20)),b=>'abcdefghijkmnpqrstuvwxyz23456789'[b%32]).join('');
 function goTrip(id){try{localStorage.setItem(TK,id)}catch(e){}location.hash='t='+id;location.reload()}
+const folderList=()=>[...new Set([...folders,...trips.map(t=>t.folder).filter(Boolean)])];
 function renderTrips(){
-  $('tlist').innerHTML=trips.map(t=>`<div class="item" style="align-items:center${t.id===TID?';border-color:var(--ac)':''}"><div class="body" data-to="${t.id}" style="cursor:pointer"><div class="t">${esc(t.name||'無題の旅')}</div><div class="sub">${t.id===TID?'表示中':'タップして開く'}</div></div>${t.id===TID?'':`<button class="del" data-tx="${t.id}" aria-label="一覧から外す">×</button>`}</div>`).join('');
+  const fl=folderList();
+  const opt=cur=>'<option value="">未分類</option>'+fl.map(f=>`<option value="${esc(f)}"${f===cur?' selected':''}>${esc(f)}</option>`).join('')+'<option value="__new">＋ 新しいフォルダ…</option>';
+  const row=t=>`<div class="item" style="align-items:center${t.id===TID?';border-color:var(--ac)':''}"><div class="body" data-to="${t.id}" style="cursor:pointer"><div class="t">${esc(t.name||'無題の旅')}</div><div class="sub">${t.id===TID?'表示中':'タップして開く'}</div></div><select class="mini" data-fm="${t.id}" aria-label="フォルダ">${opt(t.folder||'')}</select>${t.id===TID?'':`<button class="del" data-tx="${t.id}" aria-label="一覧から外す">×</button>`}</div>`;
+  const groups=[...fl.map(f=>[f,trips.filter(t=>t.folder===f)]),['',trips.filter(t=>!t.folder)]];
+  $('tlist').innerHTML=groups.filter(([f,l])=>f||l.length).map(([f,l])=>`<div class="gh">${f?esc(f):'未分類'}${f?` <button class="mini" data-fr="${esc(f)}">名前変更</button> <button class="mini" data-fd="${esc(f)}">削除</button>`:''}</div>`+(l.length?l.map(row).join(''):'<div class="sub" style="margin:0 0 10px 10px">このフォルダに旅はありません</div>')).join('');
 }
 $('trips').onclick=()=>{renderTrips();$('dlgT').showModal();if(document.activeElement&&document.activeElement!==$('dlgT'))document.activeElement.blur()};
 $('tclose').onclick=()=>$('dlgT').close();
-$('tnew').onclick=()=>{const id=newId();trips.push({id,name:'新しい旅'});saveTrips();goTrip(id)};
+$('tnew').onclick=()=>{const id=newId();trips.push({id,name:'新しい旅',folder:ent.folder||''});saveTrips();goTrip(id)};
+$('tfnew').onclick=()=>{const n=(prompt('フォルダ名（例：彼女、友達、家族）')||'').trim();if(!n)return;if(!folderList().includes(n))folders.push(n);saveTrips();renderTrips()};
 $('tlist').onclick=e=>{
-  const o=e.target.closest('[data-to]'),x=e.target.closest('[data-tx]');
+  if(e.target.closest('select'))return;
+  const o=e.target.closest('[data-to]'),x=e.target.closest('[data-tx]'),fr=e.target.closest('[data-fr]'),fd=e.target.closest('[data-fd]');
   if(o){if(o.dataset.to===TID)$('dlgT').close();else goTrip(o.dataset.to)}
   else if(x&&confirm('この旅を一覧から外しますか？\n（データは消えません。リンクがあれば、また開けます）')){trips=trips.filter(t=>t.id!==x.dataset.tx);saveTrips();renderTrips()}
+  else if(fr){const old=fr.dataset.fr,n=(prompt('新しいフォルダ名',old)||'').trim();if(!n||n===old)return;trips.forEach(t=>{if(t.folder===old)t.folder=n});folders=folders.map(f=>f===old?n:f);saveTrips();renderTrips()}
+  else if(fd&&confirm('このフォルダを削除しますか？\n（中の旅は「未分類」に移ります。旅のデータは消えません）')){const f=fd.dataset.fd;trips.forEach(t=>{if(t.folder===f)t.folder=''});folders=folders.filter(z=>z!==f);saveTrips();renderTrips()}
 };
+$('tlist').onchange=e=>{const sel=e.target.closest('[data-fm]');if(!sel)return;const t=trips.find(z=>z.id===sel.dataset.fm);if(!t)return;
+  if(sel.value==='__new'){const n=(prompt('新しいフォルダ名')||'').trim();if(n){if(!folderList().includes(n))folders.push(n);t.folder=n}}
+  else t.folder=sel.value;
+  saveTrips();renderTrips()};
 let editPh=[];
 function renderPh(){
   $('phs').innerHTML=editPh.map((p,i)=>`<div class="ph"><img src="${p}" alt="写真"><button type="button" data-pd="${i}" aria-label="写真を削除">×</button></div>`).join('')+(editPh.length<4?'<button type="button" class="phadd" id="phadd" aria-label="写真を追加">＋</button>':'');
@@ -420,7 +478,7 @@ async function loadWeather(){
   renderDays();
 }
 setInterval(()=>{if(!document.hidden)renderList()},60000);
-function setSync(){if(db)$('sync').textContent=navigator.onLine?'👫 ふたりで共有中':'📴 オフライン（つながると自動で同期）'}
+function setSync(){if(db)$('sync').textContent=navigator.onLine?'👫 みんなで共有中':'📴 オフライン（つながると自動で同期）'}
 addEventListener('online',setSync);addEventListener('offline',setSync);
 const isAdm=()=>{try{return localStorage.getItem('futari-adm-'+TID)==='1'}catch(e){return false}};
 const setAdm=v=>{try{v?localStorage.setItem('futari-adm-'+TID,'1'):localStorage.removeItem('futari-adm-'+TID)}catch(e){}};
@@ -519,17 +577,20 @@ $('list').onclick=e=>{
   else if(x){if(confirm('この予定を削除しますか？')){rmItem(x.dataset.x);S.items=S.items.filter(i=>i.id!==x.dataset.x);renderList();renderCost()}}
   else if(ed)openDlg(ed.dataset.e);
 };
+let editShare=new Set();
+function renderShare(){$('fshare').innerHTML=S.members.map(m=>`<button type="button" data-sh="${esc(m.id)}" aria-pressed="${editShare.has(m.id)}">${esc(m.name)}</button>`).join('')}
+$('fshare').onclick=e=>{const b=e.target.closest('[data-sh]');if(!b)return;const id=b.dataset.sh;if(editShare.has(id))editShare.delete(id);else editShare.add(id);renderShare()};
 function openDlg(id){
   if(RO())return;
   editId=id||null;const it=id?S.items.find(i=>i.id===id):{};
   $('dh').textContent=id?'予定を編集':`${cur+1}日目の予定を追加`;
-  $('ftime').value=it.time||'';$('fcost').value=it.cost||'';$('ftitle').value=it.title||'';$('fplace').value=it.place||'';$('fnote').value=it.note||'';$('o0').textContent=S.names[0];$('o1').textContent=S.names[1];$('t0').textContent=S.names[0]+'のみ';$('t1').textContent=S.names[1]+'のみ';$('ftgt').value=it.tgt||'';$('fpay').value=it.pay||'';$('fcat').value=it.cat||'';$('fday').innerHTML=Array.from({length:S.days},(_,i)=>`<option value="${i}">${i+1}日目 ${dayLabel(i)}</option>`).join('');$('fday').value=String(it.day!==undefined?it.day:cur);editPh=[...(it.photos||[])];renderPh();
+  $('ftime').value=it.time||'';$('fcost').value=it.cost||'';$('ftitle').value=it.title||'';$('fplace').value=it.place||'';$('fnote').value=it.note||'';$('fpay').innerHTML='<option value="">未設定（精算に含めない）</option>'+S.members.map(m=>`<option value="${esc(m.id)}">${esc(m.name)}</option>`).join('');$('fpay').value=it.pay||'';editShare=new Set(shareIds(it));renderShare();$('fcat').value=it.cat||'';$('fday').innerHTML=Array.from({length:S.days},(_,i)=>`<option value="${i}">${i+1}日目 ${dayLabel(i)}</option>`).join('');$('fday').value=String(it.day!==undefined?it.day:cur);editPh=[...(it.photos||[])];renderPh();
   $('dlg').showModal();if(document.activeElement&&document.activeElement!==$('dlg'))document.activeElement.blur();
 }
 $('fab').onclick=()=>openDlg();
 $('cancel').onclick=()=>$('dlg').close();
 $('f').onsubmit=e=>{
-  const v={time:$('ftime').value,cost:+$('fcost').value||0,title:$('ftitle').value.trim(),place:$('fplace').value.trim(),note:$('fnote').value.trim(),pay:$('fpay').value,tgt:$('ftgt').value,cat:$('fcat').value,day:+$('fday').value,photos:editPh.slice()};
+  const v={time:$('ftime').value,cost:+$('fcost').value||0,title:$('ftitle').value.trim(),place:$('fplace').value.trim(),note:$('fnote').value.trim(),pay:$('fpay').value,tg:(editShare.size&&editShare.size<S.members.length)?[...editShare]:[],tgt:'',cat:$('fcat').value,day:+$('fday').value,photos:editPh.slice()};
   if(!v.title)return;
   let it;if(editId){it=S.items.find(i=>i.id===editId);Object.assign(it,v)}else{it={id:uid(),day:cur,done:false,...v};S.items.push(it)}
   cur=it.day;renderDays();putItem(it);renderList();renderCost();
@@ -555,26 +616,40 @@ $('packForm').onsubmit=e=>{e.preventDefault();const v=$('packIn').value.trim();i
 $('packTabs').onclick=e=>{const b=e.target.closest('button');if(!b)return;packF=b.dataset.pf;if(packF!=='all')$('packOwner').value=packF;renderPack()};
 $('packList').onclick=e=>{
   const po=e.target.closest('[data-po]');
-  if(po){const p=S.pack.find(p=>p.id===po.dataset.po);p.o=String(((p.o===undefined||p.o===''?2:+p.o)+1)%3);putPack(p);renderPack();return}
+  if(po){const p=S.pack.find(p=>p.id===po.dataset.po);{const order=[...mIds(),'share'];p.o=order[(order.indexOf(packOwn(p))+1)%order.length]}putPack(p);renderPack();return}
   const c=e.target.closest('[data-pc]'),x=e.target.closest('[data-px]');
   if(c){const p=S.pack.find(p=>p.id===c.dataset.pc);p.done=c.checked;putPack(p);renderPack()}
   else if(x){rmPack(x.dataset.px);S.pack=S.pack.filter(p=>p.id!==x.dataset.px);renderPack()}
 };
-$('cost').onchange=e=>{const i=e.target.dataset.n;if(i===undefined)return;S.names[+i]=e.target.value.trim()||(i==='0'?'自分':'彼女');syncMeta();renderCost();renderList();renderPack()};
-$('cp').onclick=async()=>{try{await navigator.clipboard.writeText(location.href);$('cp').textContent='コピーしました'}catch(e){prompt('このリンクを彼女に送ってください',location.href)}};
-$('sw').onclick=()=>{const v=prompt('彼女から届いたリンクかコードを貼り付けてください');if(!v)return;const m=v.trim().match(/([A-Za-z0-9_-]{12,40})$/);if(!m)return alert('コードが正しくありません');try{localStorage.setItem(TK,m[1])}catch(e){}location.hash='t='+m[1];location.reload()};
+$('cost').onchange=e=>{const id=e.target.dataset.mn;if(id===undefined)return;const m=S.members.find(z=>z.id===id);if(!m)return;m.name=e.target.value.trim()||m.name;syncMeta();renderCost();renderList();renderPack()};
+$('cost').onclick=e=>{
+  const t=e.target.closest('[data-pay],[data-rmset],[data-redo],[data-xe],[data-addx],[data-ma],[data-mr]');if(!t)return;
+  const d=t.dataset;
+  if(d.pay!==undefined){const [f,to,a]=d.pay.split('|');const r={id:uid(),from:f,to:to,amount:+a,at:Date.now(),done:false};S.settle.push(r);putSettle(r);
+    if(!calc().plan.length){S.items.forEach(x=>{if((+x.cost||0)&&!x.settled&&mIds().includes(x.pay)){x.settled=true;putItem(x)}});S.settle.forEach(q=>{if(!q.done){q.done=true;putSettle(q)}})}}
+  else if(d.rmset!==undefined){rmSettle(d.rmset);S.settle=S.settle.filter(r=>r.id!==d.rmset)}
+  else if(d.redo!==undefined){if(!confirm('精算済みを元に戻しますか？'))return;S.items.forEach(x=>{if(x.settled){x.settled=false;putItem(x)}});S.settle.forEach(q=>{if(q.done){q.done=false;putSettle(q)}})}
+  else if(d.xe!==undefined){openDlg(d.xe);return}
+  else if(d.addx!==undefined){openDlg();return}
+  else if(d.ma!==undefined){if(S.members.length>=10)return alert('メンバーは10人までです。');S.members.push({id:'m'+uid().slice(-6),name:'メンバー'+(S.members.length+1)});syncMeta()}
+  else if(d.mr!==undefined){if(S.items.some(x=>x.pay===d.mr)||S.settle.some(r=>r.from===d.mr||r.to===d.mr))return alert('このメンバーは、支払いや精算の記録があるため削除できません。');if(!confirm('このメンバーを削除しますか？'))return;S.members=S.members.filter(m=>m.id!==d.mr);syncMeta()}
+  renderCost();renderList();renderPack();
+};
+$('cp').onclick=async()=>{try{await navigator.clipboard.writeText(location.href);$('cp').textContent='コピーしました'}catch(e){prompt('このリンクを、一緒に使う人に送ってください',location.href)}};
+$('sw').onclick=()=>{const v=prompt('共有されたリンクかコードを貼り付けてください');if(!v)return;const m=v.trim().match(/([A-Za-z0-9_-]{12,40})$/);if(!m)return alert('コードが正しくありません');try{localStorage.setItem(TK,m[1])}catch(e){}location.hash='t='+m[1];location.reload()};
 all();
 (async()=>{try{
   db=shim;
   setSync();
   db.doc('trip/meta').onSnapshot(s=>{
-    if(s.exists){const d=s.data();S.title=d.title??S.title;S.start=d.start||'';S.days=d.days||S.days;if(d.names)S.names=d.names;S.dest=d.dest||'';S.mode=d.mode||'normal';S.mmsg=d.mmsg||'';S.pw=d.pw||'';if(!didAuto&&S.start){didAuto=true;const t0=new Date();t0.setHours(0,0,0,0);const k=Math.round((t0-new Date(S.start+'T00:00:00'))/864e5);if(k>=0&&k<S.days)cur=k}
+    if(s.exists){const d=s.data();S.title=d.title??S.title;S.start=d.start||'';S.days=d.days||S.days;if(Array.isArray(d.members)&&d.members.length)S.members=d.members;else if(Array.isArray(d.names)&&d.names.length)S.members=d.names.map((n,i)=>({id:String(i),name:n}));S.dest=d.dest||'';S.mode=d.mode||'normal';S.mmsg=d.mmsg||'';S.pw=d.pw||'';if(!didAuto&&S.start){didAuto=true;const t0=new Date();t0.setHours(0,0,0,0);const k=Math.round((t0-new Date(S.start+'T00:00:00'))/864e5);if(k>=0&&k<S.days)cur=k}
       if(cur>=S.days)cur=S.days-1;all();loadWeather()}
-    else{db.doc('trip/meta').set({title:S.title,start:S.start,days:S.days,names:S.names,dest:S.dest||''}).catch(ig);
+    else{db.doc('trip/meta').set({title:S.title,start:S.start,days:S.days,members:S.members,names:S.members.map(m=>m.name),dest:S.dest||''}).catch(ig);
       }
   },ig);
   db.collection('items').onSnapshot(q=>{S.items=q.docs.map(d=>d.data());renderList();renderCost()},ig);
   db.collection('pack').onSnapshot(q=>{S.pack=q.docs.map(d=>d.data());renderPack()},ig);
+  db.collection('settle').onSnapshot(q=>{S.settle=q.docs.map(d=>d.data());renderCost();renderList()},ig);
   db.collection('wish').onSnapshot(q=>{S.wish=q.docs.map(d=>d.data());renderWish()},ig);
 }catch(e){}})();
 </script>
