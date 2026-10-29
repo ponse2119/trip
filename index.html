@@ -335,7 +335,8 @@ function renderPack(){
 let openEx=new Set();
 function shareMap(x){const sh=shareIds(x),k=sh.length,v=+x.cost||0,base=Math.floor(v/k),r=v-base*k,m={};sh.forEach((id,j)=>{m[id]=base+(j<r?1:0)});return m}
 function debtorsOf(x){return mIds().includes(x.pay)?shareIds(x).filter(i=>i!==x.pay):[]}
-function isDone(x){if(x.settled)return true;const d=debtorsOf(x);return d.length>0&&d.every(i=>(x.sp||[]).includes(i))}
+function needsOf(x,bal){return debtorsOf(x).filter(i=>(x.sp||[]).includes(i)||bal[i]<0)}
+function isDone(x,bal){if(x.settled)return true;const d=needsOf(x,bal||calc().bal);return d.length>0&&d.every(i=>(x.sp||[]).includes(i))}
 function calc(){
   const ids=mIds(),paidAll={},bal={};ids.forEach(i=>{paidAll[i]=0;bal[i]=0});
   let unset=0,asg=0;
@@ -367,8 +368,9 @@ function renderCost(){
   const recHtml=recs.map(r=>`<div class="line"><span class="ok">${sr(r)}</span><button class="mini" data-rmset="${r.id}">取り消し</button></div>`).join('')+dones.map(r=>`<div class="line"><span class="ok">${sr(r)}</span></div>`).join('');
   const ex=S.items.filter(x=>+x.cost>0).sort((a,b)=>a.day-b.day||(a.time||'99:99').localeCompare(b.time||'99:99'));
   const dtxt=x=>{const d=dayDate(x.day);return d?`${d.getMonth()+1}/${d.getDate()}`:`${x.day+1}日目`};
-  const exRows=ex.map(x=>{const ok=ids.includes(x.pay),sh=shareIds(x),done=isDone(x),dl=ok?debtorsOf(x):[],sp=x.sp||[],sm=shareMap(x),open=openEx.has(x.id),spN=dl.filter(i=>sp.includes(i)).length;
-    const detail=ok&&dl.length&&!x.settled?`<div style="margin-top:8px"><button class="mini" data-xt="${x.id}">個別に精算（${spN}/${dl.length}）${open?' ▴':' ▾'}</button>${open?dl.map(i=>`<div class="line"><span>${esc(mName(i))} → ${esc(mName(x.pay))} ${yen(sm[i])}</span>${sp.includes(i)?`<span><span class="ok">精算済み</span> <button class="mini" data-sp="${x.id}|${esc(i)}">取り消し</button></span>`:`<button class="mini" data-sp="${x.id}|${esc(i)}">精算済みにする</button>`}</div>`).join(''):''}</div>`:'';
+  const exRows=ex.map(x=>{const ok=ids.includes(x.pay),sh=shareIds(x),done=isDone(x,c.bal),dl=ok?needsOf(x,c.bal):[],ex2=ok?debtorsOf(x).filter(i=>!dl.includes(i)):[],sp=x.sp||[],sm=shareMap(x),open=openEx.has(x.id),spN=dl.filter(i=>sp.includes(i)).length;
+    const skip=ex2.length&&!x.settled?`<div class="sub" style="margin-top:6px">${ex2.map(i=>esc(mName(i))).join('・')}は全体で多く払っているため、この費用の精算は不要です</div>`:'';
+    const detail=ok&&dl.length&&!x.settled?`<div style="margin-top:8px"><button class="mini" data-xt="${x.id}">個別に精算（${spN}/${dl.length}）${open?' ▴':' ▾'}</button>${open?dl.map(i=>`<div class="line"><span>${esc(mName(i))} → ${esc(mName(x.pay))} ${yen(sm[i])}</span>${sp.includes(i)?`<span><span class="ok">精算済み</span> <button class="mini" data-sp="${x.id}|${esc(i)}">取り消し</button></span>`:`<button class="mini" data-sp="${x.id}|${esc(i)}">精算済みにする</button>`}</div>`).join(''):''}${open?skip:''}</div>`:skip;
     return `<div class="exr ${done?'st':''}"><div class="exh" data-xe="${x.id}"><div><div class="ext">${esc(x.title)} <span class="pen">✎</span>${done?'<span class="stb">精算済み</span>':''}</div><div class="exs ${ok?'':'warn'}">${ok?esc(mName(x.pay))+'が立て替え':'支払った人が未設定'} (${dtxt(x)})</div><div class="chips">${S.members.map(m=>`<span class="chip ${sh.includes(m.id)?'on':''}">${esc([...m.name][0]||'?')}</span>`).join('')}</div></div><div class="exa">${yen(x.cost)}</div></div>${detail}</div>`}).join('');
   $('cost').innerHTML=`<div class="sum"><div class="sub">合計</div><div class="big">${yen(tot)}</div>
   <div class="sub">ひとりあたり ${yen(tot/n)}（${n}人で割った場合）</div></div>
