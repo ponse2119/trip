@@ -47,12 +47,13 @@ body.ro .chk,body.ro #title,body.ro .meta input,body.ro #cost input,body.ro [dat
 body.ro .tk .body,body.ro .item .body{cursor:default}
 .racts{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
 .rt{display:inline-block;text-decoration:none;color:var(--ink);max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.exr{display:flex;gap:10px;justify-content:space-between;padding:12px 0;border-top:1px solid var(--line);cursor:pointer}
+.exr{padding:12px 0;border-top:1px solid var(--line)}
+.exh{display:flex;gap:10px;justify-content:space-between;cursor:pointer}
 .exr .ext{font-weight:700;font-size:16px}
 .exr .pen{color:var(--sub);font-size:14px}
 .exr .exs{color:var(--sub);font-size:13px}
 .exr .exa{font-weight:700;font-size:17px;white-space:nowrap}
-.exr.st{opacity:.55}.exr.st .ext{text-decoration:line-through}
+.exr.st .exh{opacity:.55}.exr.st .ext{text-decoration:line-through}
 .chips{display:flex;margin-top:6px;flex-wrap:wrap;padding-left:4px}
 .chip{width:26px;height:26px;border-radius:50%;border:1.5px solid var(--line);display:inline-flex;align-items:center;justify-content:center;font-size:12px;color:var(--sub);margin-left:-4px;background:var(--card)}
 .chip.on{border-color:color-mix(in srgb,var(--ac) 55%,#fff);color:var(--ink);background:color-mix(in srgb,var(--ac) 10%,#fff)}
@@ -64,7 +65,8 @@ body.ro .tk .body,body.ro .item .body{cursor:default}
 .mrow input{flex:1;min-width:0;border:1px solid var(--line);background:var(--bg);border-radius:10px;padding:8px 10px;font-size:16px}
 .item select.mini{max-width:112px}
 body.ro #cost button{display:none}
-body.ro .exr{pointer-events:none}
+body.ro .exh{pointer-events:none}
+body.ro [data-bk]{display:none}
 .gh{font:700 16px "Shippori Mincho B1","Hiragino Mincho ProN",serif;margin:18px 0 8px;padding-left:10px;border-left:4px solid var(--ac)}
 .nx{display:inline-block;background:var(--ac);color:var(--acink);border-radius:8px;padding:0 8px;font-size:12px;font-weight:700;margin-bottom:4px}
 .tk.next{border-color:var(--ac);box-shadow:0 0 0 2px var(--ac)}
@@ -301,8 +303,8 @@ function renderList(){
       ${x.place?`<div class="sub"><a class="map" target="_blank" rel="noopener" href="https://maps.apple.com/?q=${encodeURIComponent(x.place)}">📍 ${esc(x.place)}</a></div>`:''}
       ${x.note?`<div class="sub">${esc(x.note)}</div>`:''}
       ${x.photos&&x.photos.length?`<div class="thumbs">${x.photos.map((p,i)=>`<img src="${p}" data-pv="${x.id}:${i}" alt="写真">`).join('')}</div>`:''}
-      ${x.cost?`<span class="cost ${x.settled?'st':''}">${yen(x.cost)}${S.members.some(m=>m.id===x.pay)?'（'+esc(mName(x.pay))+'）':''}${x.settled?' 精算済み':''}</span>`:''}
-      <div class="racts"><button class="mini" data-ca="${x.id}">📅 カレンダーに追加</button>${x.place?`<a class="mini rt" target="_blank" rel="noopener" href="https://maps.apple.com/?daddr=${encodeURIComponent(x.place)}&dirflg=${RM}">現在地から</a>`:''}${x.place&&nxt?`<a class="mini rt" target="_blank" rel="noopener" href="https://maps.apple.com/?saddr=${encodeURIComponent(x.place)}&daddr=${encodeURIComponent(nxt.place)}&dirflg=${RM}">次へ：${esc(nxt.title)}</a>`:''}</div>
+      ${x.cost?`<span class="cost ${isDone(x)?'st':''}">${yen(x.cost)}${S.members.some(m=>m.id===x.pay)?'（'+esc(mName(x.pay))+'）':''}${isDone(x)?' 精算済み':''}</span>`:''}
+      <div class="racts"><button class="mini" data-ca="${x.id}">📅 カレンダーに追加</button><button class="mini" data-bk="${x.id}">候補に戻す</button>${x.place?`<a class="mini rt" target="_blank" rel="noopener" href="https://maps.apple.com/?daddr=${encodeURIComponent(x.place)}&dirflg=${RM}">現在地から</a>`:''}${x.place&&nxt?`<a class="mini rt" target="_blank" rel="noopener" href="https://maps.apple.com/?saddr=${encodeURIComponent(x.place)}&daddr=${encodeURIComponent(nxt.place)}&dirflg=${RM}">次へ：${esc(nxt.title)}</a>`:''}</div>
     </div>
     <div class="side"><input type="checkbox" class="chk" data-c="${x.id}" ${x.done?'checked':''} aria-label="完了"><button class="del" data-x="${x.id}" aria-label="削除">×</button></div>
   </div>`}).join(''):`<div class="empty">この日の予定はまだありません。<br>「＋ 予定を追加」から入れてみましょう。</div>`;
@@ -330,6 +332,10 @@ function renderPack(){
     <button class="del" data-px="${p.id}" aria-label="削除">×</button>
   </div>`).join(''):`<div class="empty">${S.pack.length?'この分類の持ち物はありません。':'持ち物リストは空です。<br>充電器やパスポートなど、忘れ物防止に。'}</div>`;
 }
+let openEx=new Set();
+function shareMap(x){const sh=shareIds(x),k=sh.length,v=+x.cost||0,base=Math.floor(v/k),r=v-base*k,m={};sh.forEach((id,j)=>{m[id]=base+(j<r?1:0)});return m}
+function debtorsOf(x){return mIds().includes(x.pay)?shareIds(x).filter(i=>i!==x.pay):[]}
+function isDone(x){if(x.settled)return true;const d=debtorsOf(x);return d.length>0&&d.every(i=>(x.sp||[]).includes(i))}
 function calc(){
   const ids=mIds(),paidAll={},bal={};ids.forEach(i=>{paidAll[i]=0;bal[i]=0});
   let unset=0,asg=0;
@@ -337,9 +343,8 @@ function calc(){
     if(!ids.includes(x.pay)){unset+=v;return}
     paidAll[x.pay]+=v;
     if(x.settled)return;
-    const sh=shareIds(x),k=sh.length,base=Math.floor(v/k),r=v-base*k;
-    bal[x.pay]+=v;asg+=v;
-    sh.forEach((id,j)=>{bal[id]-=base+(j<r?1:0)});
+    const sm=shareMap(x);bal[x.pay]+=v;asg+=v;
+    Object.keys(sm).forEach(id=>{bal[id]-=sm[id];if(id!==x.pay&&(x.sp||[]).includes(id)){bal[id]+=sm[id];bal[x.pay]-=sm[id]}});
   });
   S.settle.filter(r=>!r.done).forEach(r=>{if(r.from in bal)bal[r.from]+=r.amount;if(r.to in bal)bal[r.to]-=r.amount});
   const deb=ids.filter(i=>bal[i]<0).map(i=>({id:i,a:-bal[i]})).sort((a,b)=>b.a-a.a);
@@ -362,7 +367,9 @@ function renderCost(){
   const recHtml=recs.map(r=>`<div class="line"><span class="ok">${sr(r)}</span><button class="mini" data-rmset="${r.id}">取り消し</button></div>`).join('')+dones.map(r=>`<div class="line"><span class="ok">${sr(r)}</span></div>`).join('');
   const ex=S.items.filter(x=>+x.cost>0).sort((a,b)=>a.day-b.day||(a.time||'99:99').localeCompare(b.time||'99:99'));
   const dtxt=x=>{const d=dayDate(x.day);return d?`${d.getMonth()+1}/${d.getDate()}`:`${x.day+1}日目`};
-  const exRows=ex.map(x=>{const ok=ids.includes(x.pay),sh=shareIds(x);return `<div class="exr ${x.settled?'st':''}" data-xe="${x.id}"><div><div class="ext">${esc(x.title)} <span class="pen">✎</span>${x.settled?'<span class="stb">精算済み</span>':''}</div><div class="exs ${ok?'':'warn'}">${ok?esc(mName(x.pay))+'が立て替え':'支払った人が未設定'} (${dtxt(x)})</div><div class="chips">${S.members.map(m=>`<span class="chip ${sh.includes(m.id)?'on':''}">${esc([...m.name][0]||'?')}</span>`).join('')}</div></div><div class="exa">${yen(x.cost)}</div></div>`}).join('');
+  const exRows=ex.map(x=>{const ok=ids.includes(x.pay),sh=shareIds(x),done=isDone(x),dl=ok?debtorsOf(x):[],sp=x.sp||[],sm=shareMap(x),open=openEx.has(x.id),spN=dl.filter(i=>sp.includes(i)).length;
+    const detail=ok&&dl.length&&!x.settled?`<div style="margin-top:8px"><button class="mini" data-xt="${x.id}">個別に精算（${spN}/${dl.length}）${open?' ▴':' ▾'}</button>${open?dl.map(i=>`<div class="line"><span>${esc(mName(i))} → ${esc(mName(x.pay))} ${yen(sm[i])}</span>${sp.includes(i)?`<span><span class="ok">精算済み</span> <button class="mini" data-sp="${x.id}|${esc(i)}">取り消し</button></span>`:`<button class="mini" data-sp="${x.id}|${esc(i)}">精算済みにする</button>`}</div>`).join(''):''}</div>`:'';
+    return `<div class="exr ${done?'st':''}"><div class="exh" data-xe="${x.id}"><div><div class="ext">${esc(x.title)} <span class="pen">✎</span>${done?'<span class="stb">精算済み</span>':''}</div><div class="exs ${ok?'':'warn'}">${ok?esc(mName(x.pay))+'が立て替え':'支払った人が未設定'} (${dtxt(x)})</div><div class="chips">${S.members.map(m=>`<span class="chip ${sh.includes(m.id)?'on':''}">${esc([...m.name][0]||'?')}</span>`).join('')}</div></div><div class="exa">${yen(x.cost)}</div></div>${detail}</div>`}).join('');
   $('cost').innerHTML=`<div class="sum"><div class="sub">合計</div><div class="big">${yen(tot)}</div>
   <div class="sub">ひとりあたり ${yen(tot/n)}（${n}人で割った場合）</div></div>
   <div class="sum"><div style="font-weight:700;margin-bottom:6px">精算</div>${st}${recHtml}
@@ -570,6 +577,7 @@ document.querySelector('.tabs').onclick=e=>{const b=e.target.closest('button');i
 $('days').onclick=e=>{const b=e.target.closest('button');if(!b)return;cur=+b.dataset.d;renderDays();renderList()};
 $('list').onclick=e=>{
   const pv=e.target.closest('[data-pv]');if(pv){const [id,i]=pv.dataset.pv.split(':');const it=S.items.find(z=>z.id===id);if(it&&it.photos){$('pimg').src=it.photos[+i];$('dlgP').showModal()}return}
+  const bk=e.target.closest('[data-bk]');if(bk){backToWish(bk.dataset.bk);return}
   const ca=e.target.closest('[data-ca]');if(ca){addCal([S.items.find(i=>i.id===ca.dataset.ca)]);return}
   if(e.target.closest('a.map,a.rt'))return;
   const c=e.target.closest('[data-c]'),x=e.target.closest('[data-x]'),ed=e.target.closest('[data-e]');
@@ -596,6 +604,15 @@ $('f').onsubmit=e=>{
   cur=it.day;renderDays();putItem(it);renderList();renderCost();
 };
 $('wishForm').onsubmit=e=>{e.preventDefault();const t=$('wishT').value.trim();if(!t)return;const w={id:uid(),title:t,place:$('wishP').value.trim(),note:'',day:$('wishDay').value===''?'':+$('wishDay').value,at:Date.now()};S.wish.push(w);$('wishT').value='';$('wishP').value='';putWish(w);renderWish()};
+function backToWish(id){
+  if(RO())return;
+  const x=S.items.find(i=>i.id===id);if(!x)return;
+  const extra=[(+x.cost>0?'費用':''),(x.photos&&x.photos.length?'写真':'')].filter(Boolean);
+  if(!confirm('「'+x.title+'」を候補に戻しますか？'+(extra.length?'\n（'+extra.join('・')+'は引き継がれません）':'')))return;
+  const w={id:uid(),title:x.title,place:x.place||'',note:x.note||'',day:x.day,at:Date.now()};
+  S.wish.push(w);putWish(w);rmItem(id);S.items=S.items.filter(i=>i.id!==id);
+  renderList();renderCost();renderWish();
+}
 let moveId=null;
 $('wishList').onclick=e=>{
   if(e.target.closest('a.map'))return;
@@ -623,12 +640,14 @@ $('packList').onclick=e=>{
 };
 $('cost').onchange=e=>{const id=e.target.dataset.mn;if(id===undefined)return;const m=S.members.find(z=>z.id===id);if(!m)return;m.name=e.target.value.trim()||m.name;syncMeta();renderCost();renderList();renderPack()};
 $('cost').onclick=e=>{
-  const t=e.target.closest('[data-pay],[data-rmset],[data-redo],[data-xe],[data-addx],[data-ma],[data-mr]');if(!t)return;
+  const t=e.target.closest('[data-pay],[data-rmset],[data-redo],[data-xe],[data-addx],[data-ma],[data-mr],[data-xt],[data-sp]');if(!t)return;
   const d=t.dataset;
   if(d.pay!==undefined){const [f,to,a]=d.pay.split('|');const r={id:uid(),from:f,to:to,amount:+a,at:Date.now(),done:false};S.settle.push(r);putSettle(r);
     if(!calc().plan.length){S.items.forEach(x=>{if((+x.cost||0)&&!x.settled&&mIds().includes(x.pay)){x.settled=true;putItem(x)}});S.settle.forEach(q=>{if(!q.done){q.done=true;putSettle(q)}})}}
   else if(d.rmset!==undefined){rmSettle(d.rmset);S.settle=S.settle.filter(r=>r.id!==d.rmset)}
   else if(d.redo!==undefined){if(!confirm('精算済みを元に戻しますか？'))return;S.items.forEach(x=>{if(x.settled){x.settled=false;putItem(x)}});S.settle.forEach(q=>{if(q.done){q.done=false;putSettle(q)}})}
+  else if(d.xt!==undefined){if(openEx.has(d.xt))openEx.delete(d.xt);else openEx.add(d.xt)}
+  else if(d.sp!==undefined){const [xid,mid]=d.sp.split('|');const x=S.items.find(z=>z.id===xid);if(!x)return;const q=new Set(x.sp||[]);if(q.has(mid))q.delete(mid);else q.add(mid);x.sp=[...q];putItem(x)}
   else if(d.xe!==undefined){openDlg(d.xe);return}
   else if(d.addx!==undefined){openDlg();return}
   else if(d.ma!==undefined){if(S.members.length>=10)return alert('メンバーは10人までです。');S.members.push({id:'m'+uid().slice(-6),name:'メンバー'+(S.members.length+1)});syncMeta()}
