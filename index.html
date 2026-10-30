@@ -292,6 +292,7 @@ function kind(t){
   return''}
 function guess(x){const t=x.title||'';return kind(t)||(/タクシー|レンタカー|フェリー|徒歩|移動/.test(t)?'other':kind(t+(x.place||'')))||'other'}
 function renderList(){
+  computeRP();
   const L=S.items.filter(x=>x.day===cur).sort((a,b)=>(a.time||'99:99').localeCompare(b.time||'99:99'));
   const dd=dayDate(cur),nw=new Date(),hm=pad(nw.getHours())+':'+pad(nw.getMinutes());
   const nx=dd&&ymd(dd)===ymd(nw)?L.find(x=>x.time&&!x.done&&x.time>=hm):null;
@@ -334,9 +335,40 @@ function renderPack(){
 }
 let openEx=new Set();
 function shareMap(x){const sh=shareIds(x),k=sh.length,v=+x.cost||0,base=Math.floor(v/k),r=v-base*k,m={};sh.forEach((id,j)=>{m[id]=base+(j<r?1:0)});return m}
-function debtorsOf(x){return mIds().includes(x.pay)?shareIds(x).filter(i=>i!==x.pay):[]}
-function needsOf(x,bal){return debtorsOf(x).filter(i=>(x.sp||[]).includes(i)||bal[i]<0)}
-function isDone(x,bal){if(x.settled)return true;const d=needsOf(x,bal||calc().bal);return d.length>0&&d.every(i=>(x.sp||[]).includes(i))}
+let RP={};
+function computeRP(){
+  RP={};const c=calc(),ids=mIds(),byX={};
+  c.plan.forEach(p=>{(byX[p.from]=byX[p.from]||[]).push({to:p.to,left:p.a})});
+  const doneKey=new Set(S.settle.filter(r=>r.xid).map(r=>r.xid+'|'+r.from));
+  S.items.filter(x=>(+x.cost>0)&&!x.settled&&ids.includes(x.pay)).sort((a,b)=>a.day-b.day||(a.time||'99:99').localeCompare(b.time||'99:99')||(a.id>b.id?1:-1)).forEach(x=>{
+    const sm=shareMap(x);
+    shareIds(x).forEach(X=>{if(X===x.pay)return;const key=x.id+'|'+X;
+      if(doneKey.has(key)){RP[key]={done:true,amt:0,parts:[]};return}
+      let need=sm[X];const parts=[];
+      for(const t of (byX[X]||[])){if(need<=0)break;const a=Math.min(need,t.left);if(a>0){parts.push({to:t.to,a});t.left-=a;need-=a}}
+      RP[key]={done:false,parts,amt:parts.reduce((q,p)=>q+p.a,0)};
+    });
+  });
+}
+function isDone(x){
+  if(x.settled)return true;if(!mIds().includes(x.pay))return false;
+  const rs=shareIds(x).filter(i=>i!==x.pay).map(i=>RP[x.id+'|'+i]).filter(Boolean);
+  return rs.some(r=>r.done)&&rs.every(r=>r.done||r.amt===0);
+}
+function finalizeIfClear(){
+  if(calc().plan.length)return;
+  S.items.forEach(x=>{if((+x.cost||0)&&!x.settled&&mIds().includes(x.pay)){x.settled=true;putItem(x)}});
+  S.settle.forEach(q=>{if(!q.done){q.done=true;putSettle(q)}});
+}
+function migrateSp(){
+  if(!db||RO()||!metaReady)return;
+  S.items.forEach(x=>{
+    if(!(x.sp&&x.sp.length))return;
+    if(!x.settled&&mIds().includes(x.pay)){const sm=shareMap(x);x.sp.forEach(id=>{if(sm[id]&&id!==x.pay){const r={id:'mg_'+x.id+'_'+id,from:id,to:x.pay,amount:sm[id],at:Date.now(),done:false};if(!S.settle.some(q=>q.id===r.id)){S.settle.push(r);putSettle(r)}}})}
+    x.sp=[];putItem(x);
+  });
+}
+let metaReady=false;
 function calc(){
   const ids=mIds(),paidAll={},bal={};ids.forEach(i=>{paidAll[i]=0;bal[i]=0});
   let unset=0,asg=0;
@@ -345,32 +377,42 @@ function calc(){
     paidAll[x.pay]+=v;
     if(x.settled)return;
     const sm=shareMap(x);bal[x.pay]+=v;asg+=v;
-    Object.keys(sm).forEach(id=>{bal[id]-=sm[id];if(id!==x.pay&&(x.sp||[]).includes(id)){bal[id]+=sm[id];bal[x.pay]-=sm[id]}});
+    Object.keys(sm).forEach(id=>{bal[id]-=sm[id]});
   });
-  S.settle.filter(r=>!r.done).forEach(r=>{if(r.from in bal)bal[r.from]+=r.amount;if(r.to in bal)bal[r.to]-=r.amount});
+  /* 精算記録は「払う側の残りの借り」と「受け取る側の残りの貸し」を超えて反映しない（多く払った人が払う側に回らないため） */
+  let over=0;
+  S.settle.filter(r=>!r.done).slice().sort((a,b)=>(a.at||0)-(b.at||0)).forEach(r=>{
+    if(!(r.from in bal)||!(r.to in bal))return;
+    const e=Math.max(0,Math.min(r.amount,-bal[r.from],bal[r.to]));
+    bal[r.from]+=e;bal[r.to]-=e;over+=r.amount-e;
+  });
   const deb=ids.filter(i=>bal[i]<0).map(i=>({id:i,a:-bal[i]})).sort((a,b)=>b.a-a.a);
   const cre=ids.filter(i=>bal[i]>0).map(i=>({id:i,a:bal[i]})).sort((a,b)=>b.a-a.a);
   const plan=[];let i=0,j=0;
   while(i<deb.length&&j<cre.length){const t=Math.min(deb[i].a,cre[j].a);if(t>0)plan.push({from:deb[i].id,to:cre[j].id,a:t});deb[i].a-=t;cre[j].a-=t;if(deb[i].a<=0)i++;if(cre[j].a<=0)j++}
-  return{paidAll,bal,plan,asg,unset};
+  return{paidAll,bal,plan,asg,unset,over};
 }
 function renderCost(){
+  computeRP();
   const ids=mIds(),c=calc(),n=S.members.length;
   const tot=S.items.reduce((a,x)=>a+(+x.cost||0),0);
   const per=Array.from({length:S.days},(_,i)=>S.items.filter(x=>x.day===i).reduce((a,x)=>a+(+x.cost||0),0));
   const recs=S.settle.filter(r=>!r.done),dones=S.settle.filter(r=>r.done);
   const anySettled=dones.length>0||S.items.some(x=>x.settled);
-  const sr=r=>`${esc(mName(r.from))}は${esc(mName(r.to))}に${yen(r.amount)} 精算済み`;
+  const sr=r=>`${esc(mName(r.from))}は${esc(mName(r.to))}に${yen(r.amount)} 精算済み${r.xid?'（'+esc((S.items.find(i=>i.id===r.xid)||{}).title||'')+'）':''}`;
   let st;
   if(c.plan.length)st=c.plan.map(p=>`<div class="line"><span>${esc(mName(p.from))} → ${esc(mName(p.to))}</span><span><b>${yen(p.a)}</b> <button class="mini" data-pay="${esc(p.from)}|${esc(p.to)}|${p.a}">精算済みにする</button></span></div>`).join('');
   else if(S.settle.length)st='<div class="ok" style="padding:6px 0">すべて精算済みです</div>';
   else st=c.asg===0?'<div class="sub">「支払った人」を入れると、精算額が出ます</div>':'<div class="sub">精算なし（貸し借りなし）</div>';
-  const recHtml=recs.map(r=>`<div class="line"><span class="ok">${sr(r)}</span><button class="mini" data-rmset="${r.id}">取り消し</button></div>`).join('')+dones.map(r=>`<div class="line"><span class="ok">${sr(r)}</span></div>`).join('');
+  const overHtml=c.over>0?`<div class="sub warn" style="margin-top:8px">精算済みの記録のうち${yen(c.over)}は、実際の差し引きを超えているため、計算に含めていません。内容が違うときは、下の「取り消し」で整理してください。</div>`:'';
+  const recHtml=overHtml+recs.map(r=>`<div class="line"><span class="ok">${sr(r)}</span><button class="mini" data-rmset="${r.id}">取り消し</button></div>`).join('')+dones.map(r=>`<div class="line"><span class="ok">${sr(r)}</span></div>`).join('');
   const ex=S.items.filter(x=>+x.cost>0).sort((a,b)=>a.day-b.day||(a.time||'99:99').localeCompare(b.time||'99:99'));
   const dtxt=x=>{const d=dayDate(x.day);return d?`${d.getMonth()+1}/${d.getDate()}`:`${x.day+1}日目`};
-  const exRows=ex.map(x=>{const ok=ids.includes(x.pay),sh=shareIds(x),done=isDone(x,c.bal),dl=ok?needsOf(x,c.bal):[],ex2=ok?debtorsOf(x).filter(i=>!dl.includes(i)):[],sp=x.sp||[],sm=shareMap(x),open=openEx.has(x.id),spN=dl.filter(i=>sp.includes(i)).length;
-    const skip=ex2.length&&!x.settled?`<div class="sub" style="margin-top:6px">${ex2.map(i=>esc(mName(i))).join('・')}は全体で多く払っているため、この費用の精算は不要です</div>`:'';
-    const detail=ok&&dl.length&&!x.settled?`<div style="margin-top:8px"><button class="mini" data-xt="${x.id}">個別に精算（${spN}/${dl.length}）${open?' ▴':' ▾'}</button>${open?dl.map(i=>`<div class="line"><span>${esc(mName(i))} → ${esc(mName(x.pay))} ${yen(sm[i])}</span>${sp.includes(i)?`<span><span class="ok">精算済み</span> <button class="mini" data-sp="${x.id}|${esc(i)}">取り消し</button></span>`:`<button class="mini" data-sp="${x.id}|${esc(i)}">精算済みにする</button>`}</div>`).join(''):''}${open?skip:''}</div>`:skip;
+  const exRows=ex.map(x=>{const ok=ids.includes(x.pay),sh=shareIds(x),done=isDone(x),open=openEx.has(x.id);
+    const rs=ok&&!x.settled?shareIds(x).filter(i=>i!==x.pay).map(i=>({i,r:RP[x.id+'|'+i]})).filter(z=>z.r):[];
+    const dn=rs.filter(z=>z.r.done),pend=rs.filter(z=>!z.r.done&&z.r.amt>0);
+    const lines=rs.map(({i,r})=>r.done?`<div class="line"><span>${esc(mName(i))} → ${S.settle.filter(q=>q.xid===x.id&&q.from===i).map(q=>esc(mName(q.to))+' '+yen(q.amount)).join('、')} <span class="ok">精算済み</span></span><button class="mini" data-xu="${x.id}|${esc(i)}">取り消し</button></div>`:r.amt>0?`<div class="line"><span>${esc(mName(i))} → ${r.parts.map(p=>esc(mName(p.to))+' '+yen(p.a)).join('、')}</span><button class="mini" data-xp="${x.id}|${esc(i)}">精算済みにする</button></div>`:`<div class="line"><span class="sub">${esc(mName(i))}：精算不要（全体の差し引きで相殺）</span></div>`).join('');
+    const detail=!rs.length?'':(dn.length+pend.length===0?'<div class="sub" style="margin-top:6px">この費用は、全体の差し引きで精算不要です</div>':`<div style="margin-top:8px"><button class="mini" data-xt="${x.id}">個別に精算（${dn.length}/${dn.length+pend.length}）${open?' ▴':' ▾'}</button>${open?lines+'<div class="sub" style="margin-top:6px">支払い先は、全体の精算（差し引き）に合わせて表示しています。</div>':''}</div>`);
     return `<div class="exr ${done?'st':''}"><div class="exh" data-xe="${x.id}"><div><div class="ext">${esc(x.title)} <span class="pen">✎</span>${done?'<span class="stb">精算済み</span>':''}</div><div class="exs ${ok?'':'warn'}">${ok?esc(mName(x.pay))+'が立て替え':'支払った人が未設定'} (${dtxt(x)})</div><div class="chips">${S.members.map(m=>`<span class="chip ${sh.includes(m.id)?'on':''}">${esc([...m.name][0]||'?')}</span>`).join('')}</div></div><div class="exa">${yen(x.cost)}</div></div>${detail}</div>`}).join('');
   $('cost').innerHTML=`<div class="sum"><div class="sub">合計</div><div class="big">${yen(tot)}</div>
   <div class="sub">ひとりあたり ${yen(tot/n)}（${n}人で割った場合）</div></div>
@@ -642,14 +684,16 @@ $('packList').onclick=e=>{
 };
 $('cost').onchange=e=>{const id=e.target.dataset.mn;if(id===undefined)return;const m=S.members.find(z=>z.id===id);if(!m)return;m.name=e.target.value.trim()||m.name;syncMeta();renderCost();renderList();renderPack()};
 $('cost').onclick=e=>{
-  const t=e.target.closest('[data-pay],[data-rmset],[data-redo],[data-xe],[data-addx],[data-ma],[data-mr],[data-xt],[data-sp]');if(!t)return;
+  const t=e.target.closest('[data-pay],[data-rmset],[data-redo],[data-xe],[data-addx],[data-ma],[data-mr],[data-xt],[data-xp],[data-xu]');if(!t)return;
   const d=t.dataset;
   if(d.pay!==undefined){const [f,to,a]=d.pay.split('|');const r={id:uid(),from:f,to:to,amount:+a,at:Date.now(),done:false};S.settle.push(r);putSettle(r);
-    if(!calc().plan.length){S.items.forEach(x=>{if((+x.cost||0)&&!x.settled&&mIds().includes(x.pay)){x.settled=true;putItem(x)}});S.settle.forEach(q=>{if(!q.done){q.done=true;putSettle(q)}})}}
+    finalizeIfClear()}
   else if(d.rmset!==undefined){rmSettle(d.rmset);S.settle=S.settle.filter(r=>r.id!==d.rmset)}
   else if(d.redo!==undefined){if(!confirm('精算済みを元に戻しますか？'))return;S.items.forEach(x=>{if(x.settled){x.settled=false;putItem(x)}});S.settle.forEach(q=>{if(q.done){q.done=false;putSettle(q)}})}
   else if(d.xt!==undefined){if(openEx.has(d.xt))openEx.delete(d.xt);else openEx.add(d.xt)}
-  else if(d.sp!==undefined){const [xid,mid]=d.sp.split('|');const x=S.items.find(z=>z.id===xid);if(!x)return;const q=new Set(x.sp||[]);if(q.has(mid))q.delete(mid);else q.add(mid);x.sp=[...q];putItem(x)}
+  else if(d.xp!==undefined){computeRP();const r=RP[d.xp];if(!r||r.done||!r.parts.length)return;const [xid,X]=d.xp.split('|');
+    r.parts.forEach(p=>{const rec={id:'ex_'+xid+'_'+X+'_'+p.to,from:X,to:p.to,amount:p.a,at:Date.now(),done:false,xid};S.settle.push(rec);putSettle(rec)});finalizeIfClear()}
+  else if(d.xu!==undefined){const [xid,X]=d.xu.split('|');const rs=S.settle.filter(r=>r.xid===xid&&r.from===X&&!r.done);rs.forEach(r=>rmSettle(r.id));S.settle=S.settle.filter(r=>!rs.includes(r))}
   else if(d.xe!==undefined){openDlg(d.xe);return}
   else if(d.addx!==undefined){openDlg();return}
   else if(d.ma!==undefined){if(S.members.length>=10)return alert('メンバーは10人までです。');S.members.push({id:'m'+uid().slice(-6),name:'メンバー'+(S.members.length+1)});syncMeta()}
@@ -663,12 +707,12 @@ all();
   db=shim;
   setSync();
   db.doc('trip/meta').onSnapshot(s=>{
-    if(s.exists){const d=s.data();S.title=d.title??S.title;S.start=d.start||'';S.days=d.days||S.days;if(Array.isArray(d.members)&&d.members.length)S.members=d.members;else if(Array.isArray(d.names)&&d.names.length)S.members=d.names.map((n,i)=>({id:String(i),name:n}));S.dest=d.dest||'';S.mode=d.mode||'normal';S.mmsg=d.mmsg||'';S.pw=d.pw||'';if(!didAuto&&S.start){didAuto=true;const t0=new Date();t0.setHours(0,0,0,0);const k=Math.round((t0-new Date(S.start+'T00:00:00'))/864e5);if(k>=0&&k<S.days)cur=k}
-      if(cur>=S.days)cur=S.days-1;all();loadWeather()}
+    if(s.exists){const d=s.data();S.title=d.title??S.title;S.start=d.start||'';S.days=d.days||S.days;if(Array.isArray(d.members)&&d.members.length)S.members=d.members;else if(Array.isArray(d.names)&&d.names.length)S.members=d.names.map((n,i)=>({id:String(i),name:n}));S.dest=d.dest||'';metaReady=true;S.mode=d.mode||'normal';S.mmsg=d.mmsg||'';S.pw=d.pw||'';if(!didAuto&&S.start){didAuto=true;const t0=new Date();t0.setHours(0,0,0,0);const k=Math.round((t0-new Date(S.start+'T00:00:00'))/864e5);if(k>=0&&k<S.days)cur=k}
+      if(cur>=S.days)cur=S.days-1;migrateSp();all();loadWeather()}
     else{db.doc('trip/meta').set({title:S.title,start:S.start,days:S.days,members:S.members,names:S.members.map(m=>m.name),dest:S.dest||''}).catch(ig);
       }
   },ig);
-  db.collection('items').onSnapshot(q=>{S.items=q.docs.map(d=>d.data());renderList();renderCost()},ig);
+  db.collection('items').onSnapshot(q=>{S.items=q.docs.map(d=>d.data());migrateSp();renderList();renderCost()},ig);
   db.collection('pack').onSnapshot(q=>{S.pack=q.docs.map(d=>d.data());renderPack()},ig);
   db.collection('settle').onSnapshot(q=>{S.settle=q.docs.map(d=>d.data());renderCost();renderList()},ig);
   db.collection('wish').onSnapshot(q=>{S.wish=q.docs.map(d=>d.data());renderWish()},ig);
