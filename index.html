@@ -301,15 +301,23 @@ function renderList(){
     <div class="stub"><div class="ic">${ic}</div><div class="tm">${x.time||'--:--'}</div></div>
     <div class="body" data-e="${x.id}">
       ${nx===x?'<span class="nx">次の予定</span>':''}<div class="t">${esc(x.title)}</div>
-      ${x.place?`<div class="sub"><a class="map" target="_blank" rel="noopener" href="https://maps.apple.com/?q=${encodeURIComponent(x.place)}">📍 ${esc(x.place)}</a></div>`:''}
+      ${x.place?`<div class="sub"><a class="map" target="_blank" rel="noopener" href="${mapSearch(x.place)}">📍 ${esc(x.place)}</a></div>`:''}
       ${x.note?`<div class="sub">${esc(x.note)}</div>`:''}
       ${x.photos&&x.photos.length?`<div class="thumbs">${x.photos.map((p,i)=>`<img src="${p}" data-pv="${x.id}:${i}" alt="写真">`).join('')}</div>`:''}
       ${x.cost?`<span class="cost ${isDone(x)?'st':''}">${yen(x.cost)}${S.members.some(m=>m.id===x.pay)?'（'+esc(mName(x.pay))+'）':''}${isDone(x)?' 精算済み':''}</span>`:''}
-      <div class="racts"><button class="mini" data-ca="${x.id}">📅 カレンダーに追加</button><button class="mini" data-bk="${x.id}">候補に戻す</button>${x.place?`<a class="mini rt" target="_blank" rel="noopener" href="https://maps.apple.com/?daddr=${encodeURIComponent(x.place)}&dirflg=${RM}">現在地から</a>`:''}${x.place&&nxt?`<a class="mini rt" target="_blank" rel="noopener" href="https://maps.apple.com/?saddr=${encodeURIComponent(x.place)}&daddr=${encodeURIComponent(nxt.place)}&dirflg=${RM}">次へ：${esc(nxt.title)}</a>`:''}</div>
+      <div class="racts"><button class="mini" data-ca="${x.id}">📅 カレンダーに追加</button><button class="mini" data-bk="${x.id}">候補に戻す</button>${x.place?`<a class="mini rt" target="_blank" rel="noopener" href="${mapRoute('',x.place)}">現在地から</a>`:''}${x.place&&nxt?`<a class="mini rt" target="_blank" rel="noopener" href="${mapRoute(x.place,nxt.place)}">次へ：${esc(nxt.title)}</a>`:''}</div>
     </div>
     <div class="side"><input type="checkbox" class="chk" data-c="${x.id}" ${x.done?'checked':''} aria-label="完了"><button class="del" data-x="${x.id}" aria-label="削除">×</button></div>
   </div>`}).join(''):`<div class="empty">この日の予定はまだありません。<br>「＋ 予定を追加」から入れてみましょう。</div>`;
 }
+/* iPhone・iPad・MacはAppleマップ、それ以外（Androidなど）はGoogleマップ */
+const isApple=/iPhone|iPad|iPod|Macintosh/.test(navigator.userAgent)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);
+const mapSearch=p=>isApple?'https://maps.apple.com/?q='+encodeURIComponent(p):'https://www.google.com/maps/search/?api=1&query='+encodeURIComponent(p);
+const mapRoute=(from,to)=>{
+  const m=(typeof RM!=='undefined'?RM:'r');
+  if(isApple)return 'https://maps.apple.com/?'+(from?'saddr='+encodeURIComponent(from)+'&':'')+'daddr='+encodeURIComponent(to)+'&dirflg='+m;
+  return 'https://www.google.com/maps/dir/?api=1&destination='+encodeURIComponent(to)+(from?'&origin='+encodeURIComponent(from):'')+'&travelmode='+({r:'transit',w:'walking',d:'driving'}[m]||'transit');
+};
 const mName=id=>{const m=S.members.find(m=>m.id===id);return m?m.name:'?'};
 const mIds=()=>S.members.map(m=>m.id);
 const shareIds=x=>{const ids=mIds();if(x.tg&&x.tg.length){const g=x.tg.filter(i=>ids.includes(i));if(g.length)return g}if((x.tgt==='0'||x.tgt==='1')&&ids.includes(x.tgt))return[x.tgt];return ids};
@@ -594,7 +602,7 @@ function renderWish(){
   <div class="item">
     <div class="body" data-we="${w.id}" style="cursor:pointer">
       <div class="t">${esc(w.title)}</div>
-      ${w.place?`<div class="sub"><a class="map" target="_blank" rel="noopener" href="https://maps.apple.com/?q=${encodeURIComponent(w.place)}">📍 ${esc(w.place)}</a></div>`:''}
+      ${w.place?`<div class="sub"><a class="map" target="_blank" rel="noopener" href="${mapSearch(w.place)}">📍 ${esc(w.place)}</a></div>`:''}
       ${w.note?`<div class="sub">${esc(w.note)}</div>`:''}
       <button class="mini" data-wm="${w.id}" style="margin-top:8px;color:var(--ac);font-weight:700">予定に入れる</button>
     </div>
