@@ -213,7 +213,7 @@ dialog:focus{outline:none}
       <div><label for="ftime">時間</label><input type="time" id="ftime"></div>
       <div><label for="fcost">費用（円）</label><input type="number" id="fcost" inputmode="numeric" min="0" placeholder="0"></div>
     </div>
-    <label for="fcat">種類</label><select id="fcat"><option value="">おまかせ（自動）</option><option value="plane">✈️ 飛行機</option><option value="train">🚆 電車</option><option value="bus">🚌 バス</option><option value="food">🍜 食事</option><option value="sight">⛩️ 観光</option><option value="stay">🏨 宿泊</option><option value="other">📌 その他</option></select>
+    <label for="fcat">種類</label><select id="fcat"><option value="">おまかせ（自動）</option><option value="plane">✈️ 飛行機</option><option value="train">🚆 電車</option><option value="bus">🚌 バス</option><option value="food">🍚 食事</option><option value="sight">⛩️ 観光</option><option value="stay">🏠 宿泊</option><option value="other">📌 その他</option></select>
     <label for="fpay">支払った人（精算に使います）</label><select id="fpay"></select>
     <label>精算の対象（誰のための費用か）</label><div class="days" id="fshare" style="flex-wrap:wrap"></div>
     <label for="ftitle">やること</label><input id="ftitle" required maxlength="60" placeholder="例：清水寺を散歩">
@@ -281,7 +281,7 @@ function renderDays(){
   const txt=w?`${WC(w.c)[0]} ${WC(w.c)[1]}　最高${w.hi}° / 最低${w.lo}°　降水確率${w.pop??'-'}%`:(S.dest&&S.start?'天気予報は、出発の約2週間前から表示されます':'');
   el.textContent=txt;el.hidden=!txt;
 }
-const CATS={plane:['✈️','#5aa9e6'],train:['🚆','#2fb59b'],bus:['🚌','#7bb661'],food:['🍜','#f4a43a'],sight:['⛩️','#e4513a'],stay:['🏨','#9b8cf0'],other:['📌','#8a98b3']};
+const CATS={plane:['✈️','#5aa9e6'],train:['🚆','#2fb59b'],bus:['🚌','#7bb661'],food:['🍚','#f4a43a'],sight:['⛩️','#e4513a'],stay:['🏠','#9b8cf0'],other:['📌','#8a98b3']};
 function kind(t){
   if(/バス/.test(t))return'bus';
   if(/電車|新幹線|地下鉄|駅|特急|JR|モノレール|鉄道|電鉄/.test(t))return'train';
