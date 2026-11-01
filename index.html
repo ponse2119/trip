@@ -95,7 +95,7 @@ body.ro [data-bk]{display:none}
 .map{color:var(--link);text-decoration:underline;text-underline-offset:3px}
 .empty{text-align:center;color:var(--sub);padding:36px 12px;border:2px dashed var(--line);border-radius:14px}
 .fab{position:fixed;right:max(16px,calc(50% - 264px));bottom:calc(20px + env(safe-area-inset-bottom,0px));background:var(--ac);color:var(--acink);border:0;border-radius:28px;padding:14px 22px;font-weight:700;box-shadow:0 6px 16px rgba(217,68,46,.35);cursor:pointer}
-dialog{border:0;border-radius:20px;background:var(--card);color:var(--ink);width:calc(100% - 24px);max-width:520px;padding:18px 18px 0;position:fixed;top:calc(max(12px,env(safe-area-inset-top)) + var(--vvt,0px));bottom:auto;left:0;right:0;margin:0 auto;max-height:calc(100% - 24px);max-height:calc(var(--vvh,100dvh) - max(12px,env(safe-area-inset-top)) - 12px);overflow-y:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch}
+dialog{border:0;border-radius:20px;background:var(--card);color:var(--ink);width:calc(100% - 24px);max-width:520px;padding:18px 18px 0;margin:auto auto 12px;max-height:calc(100% - 24px);overflow:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch}
 dialog::backdrop{background:rgba(20,33,61,.45)}
 dialog h2{margin:0 0 10px;font:800 19px "Shippori Mincho B1","Hiragino Mincho ProN",serif}
 label{display:block;font-size:13px;color:var(--sub);margin-top:10px}
@@ -713,7 +713,6 @@ $('cost').onclick=e=>{
   else if(d.mr!==undefined){if(S.items.some(x=>x.pay===d.mr)||S.settle.some(r=>r.from===d.mr||r.to===d.mr))return alert('このメンバーは、支払いや精算の記録があるため削除できません。');if(!confirm('このメンバーを削除しますか？'))return;S.members=S.members.filter(m=>m.id!==d.mr);syncMeta()}
   renderCost();renderList();renderPack();
 };
-if(window.visualViewport){const vv=window.visualViewport,sv=()=>{const r=document.documentElement.style;r.setProperty('--vvh',vv.height+'px');r.setProperty('--vvt',vv.offsetTop+'px')};vv.addEventListener('resize',sv);vv.addEventListener('scroll',sv);sv()}
 $('cp').onclick=async()=>{try{await navigator.clipboard.writeText(location.href);$('cp').textContent='コピーしました'}catch(e){prompt('このリンクを、一緒に使う人に送ってください',location.href)}};
 $('sw').onclick=()=>{const v=prompt('共有されたリンクかコードを貼り付けてください');if(!v)return;const m=v.trim().match(/([A-Za-z0-9_-]{12,40})$/);if(!m)return alert('コードが正しくありません');try{localStorage.setItem(TK,m[1])}catch(e){}location.hash='t='+m[1];location.reload()};
 all();
