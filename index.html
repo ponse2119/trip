@@ -66,6 +66,7 @@ body.ro .tk .body,body.ro .item .body{cursor:default}
 .item select.mini{max-width:112px}
 body.ro #cost button{display:none}
 body.ro .exh{pointer-events:none}
+#dlg.xm [data-xh]{display:none}
 body.ro [data-bk]{display:none}
 .gh{font:700 16px "Shippori Mincho B1","Hiragino Mincho ProN",serif;margin:18px 0 8px;padding-left:10px;border-left:4px solid var(--ac)}
 .nx{display:inline-block;background:var(--ac);color:var(--acink);border-radius:8px;padding:0 8px;font-size:12px;font-weight:700;margin-bottom:4px}
@@ -210,16 +211,17 @@ dialog:focus{outline:none}
     <h2 id="dh">予定を追加</h2>
     <label for="fday">日にち</label><select id="fday"></select>
     <div class="row">
-      <div><label for="ftime">時間</label><input type="time" id="ftime"></div>
+      <div data-xh><label for="ftime">時間</label><input type="time" id="ftime"></div>
       <div><label for="fcost">費用（円）</label><input type="number" id="fcost" inputmode="numeric" min="0" placeholder="0"></div>
     </div>
-    <label for="fcat">種類</label><select id="fcat"><option value="">おまかせ（自動）</option><option value="plane">✈️ 飛行機</option><option value="train">🚆 電車</option><option value="bus">🚌 バス</option><option value="food">🍚 食事</option><option value="sight">⛩️ 観光</option><option value="stay">🏠 宿泊</option><option value="other">📌 その他</option></select>
+    <label data-xh for="fcat">種類</label><select data-xh id="fcat"><option value="">おまかせ（自動）</option><option value="plane">✈️ 飛行機</option><option value="train">🚆 電車</option><option value="bus">🚌 バス</option><option value="food">🍚 食事</option><option value="sight">⛩️ 観光</option><option value="stay">🏠 宿泊</option><option value="other">📌 その他</option></select>
     <label for="fpay">支払った人（精算に使います）</label><select id="fpay"></select>
     <label>精算の対象（誰のための費用か）</label><div class="days" id="fshare" style="flex-wrap:wrap"></div>
-    <label for="ftitle">やること</label><input id="ftitle" required maxlength="60" placeholder="例：清水寺を散歩">
-    <label for="fplace">場所</label><input id="fplace" maxlength="80" placeholder="例：京都市東山区">
-    <label for="fnote">メモ</label><textarea id="fnote" rows="2" maxlength="200" placeholder="予約番号、持っていくものなど"></textarea>
-    <label>写真（最大4枚）</label><div class="phs" id="phs"></div><input type="file" id="phin" accept="image/*" multiple hidden>
+    <label for="ftitle" id="lt">やること</label><input id="ftitle" required maxlength="60" placeholder="例：清水寺を散歩">
+    <label data-xh for="fplace">場所</label><input data-xh id="fplace" maxlength="80" placeholder="例：京都市東山区">
+    <label data-xh for="fnote">メモ</label><textarea data-xh id="fnote" rows="2" maxlength="200" placeholder="予約番号、持っていくものなど"></textarea>
+    <label data-xh>写真（最大4枚）</label><div class="phs" data-xh id="phs"></div><input type="file" id="phin" accept="image/*" multiple hidden>
+    <button type="button" class="mini" id="fdel" hidden style="margin-top:14px">この費用を削除</button>
     <div class="acts"><button type="button" id="cancel">キャンセル</button><button class="pri" id="save">保存</button></div>
   </form>
 </dialog>
@@ -293,7 +295,7 @@ function kind(t){
 function guess(x){const t=x.title||'';return kind(t)||(/タクシー|レンタカー|フェリー|徒歩|移動/.test(t)?'other':kind(t+(x.place||'')))||'other'}
 function renderList(){
   computeRP();
-  const L=S.items.filter(x=>x.day===cur).sort((a,b)=>(a.time||'99:99').localeCompare(b.time||'99:99'));
+  const L=S.items.filter(x=>x.day===cur&&!x.eo).sort((a,b)=>(a.time||'99:99').localeCompare(b.time||'99:99'));
   const dd=dayDate(cur),nw=new Date(),hm=pad(nw.getHours())+':'+pad(nw.getMinutes());
   const nx=dd&&ymd(dd)===ymd(nw)?L.find(x=>x.time&&!x.done&&x.time>=hm):null;
   $('list').innerHTML=L.length?L.map((x,ix)=>{const nxt=L.slice(ix+1).find(y=>y.place);const k=CATS[x.cat]?x.cat:guess(x),[ic,cc]=CATS[k];return `
@@ -525,7 +527,7 @@ async function addCal(list){
   const a=document.createElement('a');a.href=u;document.body.appendChild(a);a.click();a.remove();
   setTimeout(()=>URL.revokeObjectURL(u),60000);
 }
-$('calDay').onclick=()=>addCal(S.items.filter(x=>x.day===cur));
+$('calDay').onclick=()=>addCal(S.items.filter(x=>x.day===cur&&!x.eo));
 let RM='r';try{RM=localStorage.getItem('futari-rmode')||'r'}catch(e){}
 $('rmode').value=RM;
 $('rmode').onchange=e=>{RM=e.target.value;try{localStorage.setItem('futari-rmode',RM)}catch(x){}renderList()};
@@ -653,21 +655,27 @@ $('list').onclick=e=>{
 let editShare=new Set();
 function renderShare(){$('fshare').innerHTML=S.members.map(m=>`<button type="button" data-sh="${esc(m.id)}" aria-pressed="${editShare.has(m.id)}">${esc(m.name)}</button>`).join('')}
 $('fshare').onclick=e=>{const b=e.target.closest('[data-sh]');if(!b)return;const id=b.dataset.sh;if(editShare.has(id))editShare.delete(id);else editShare.add(id);renderShare()};
-function openDlg(id){
+let editXm=false;
+function openDlg(id,xm){
   if(RO())return;
   editId=id||null;const it=id?S.items.find(i=>i.id===id):{};
-  $('dh').textContent=id?'予定を編集':`${cur+1}日目の予定を追加`;
+  editXm=!!(xm||it.eo);
+  $('dlg').classList.toggle('xm',editXm);
+  $('dh').textContent=editXm?(id?'費用を編集':'費用を追加'):(id?'予定を編集':`${cur+1}日目の予定を追加`);
+  $('lt').textContent=editXm?'費用の名前':'やること';$('ftitle').placeholder=editXm?'例：タクシー代':'例：清水寺を散歩';$('fcost').required=editXm;$('fdel').hidden=!(editXm&&id);
   $('ftime').value=it.time||'';$('fcost').value=it.cost||'';$('ftitle').value=it.title||'';$('fplace').value=it.place||'';$('fnote').value=it.note||'';$('fpay').innerHTML='<option value="">未設定（精算に含めない）</option>'+S.members.map(m=>`<option value="${esc(m.id)}">${esc(m.name)}</option>`).join('');$('fpay').value=it.pay||'';editShare=new Set(shareIds(it));renderShare();$('fcat').value=it.cat||'';$('fday').innerHTML=Array.from({length:S.days},(_,i)=>`<option value="${i}">${i+1}日目 ${dayLabel(i)}</option>`).join('');$('fday').value=String(it.day!==undefined?it.day:cur);editPh=[...(it.photos||[])];renderPh();
   $('dlg').showModal();if(document.activeElement&&document.activeElement!==$('dlg'))document.activeElement.blur();
 }
 $('fab').onclick=()=>openDlg();
 $('cancel').onclick=()=>$('dlg').close();
 $('f').onsubmit=e=>{
-  const v={time:$('ftime').value,cost:+$('fcost').value||0,title:$('ftitle').value.trim(),place:$('fplace').value.trim(),note:$('fnote').value.trim(),pay:$('fpay').value,tg:(editShare.size&&editShare.size<S.members.length)?[...editShare]:[],tgt:'',cat:$('fcat').value,day:+$('fday').value,photos:editPh.slice()};
+  const v={time:$('ftime').value,cost:+$('fcost').value||0,title:$('ftitle').value.trim(),place:$('fplace').value.trim(),note:$('fnote').value.trim(),pay:$('fpay').value,tg:(editShare.size&&editShare.size<S.members.length)?[...editShare]:[],tgt:'',cat:$('fcat').value,day:+$('fday').value,photos:editPh.slice(),eo:editXm};
   if(!v.title)return;
   let it;if(editId){it=S.items.find(i=>i.id===editId);Object.assign(it,v)}else{it={id:uid(),day:cur,done:false,...v};S.items.push(it)}
-  cur=it.day;renderDays();putItem(it);renderList();renderCost();
+  if(!editXm){cur=it.day;renderDays()}
+  putItem(it);renderList();renderCost();
 };
+$('fdel').onclick=()=>{if(!editId||!confirm('この費用を削除しますか？'))return;rmItem(editId);S.items=S.items.filter(i=>i.id!==editId);$('dlg').close();renderList();renderCost()};
 $('wishForm').onsubmit=e=>{e.preventDefault();const t=$('wishT').value.trim();if(!t)return;const w={id:uid(),title:t,place:$('wishP').value.trim(),note:'',day:$('wishDay').value===''?'':+$('wishDay').value,at:Date.now()};S.wish.push(w);$('wishT').value='';$('wishP').value='';putWish(w);renderWish()};
 function backToWish(id){
   if(RO())return;
@@ -716,7 +724,7 @@ $('cost').onclick=e=>{
     r.parts.forEach(p=>{const rec={id:'ex_'+xid+'_'+X+'_'+p.to,from:X,to:p.to,amount:p.a,at:Date.now(),done:false,xid};S.settle.push(rec);putSettle(rec)});finalizeIfClear()}
   else if(d.xu!==undefined){const [xid,X]=d.xu.split('|');const rs=S.settle.filter(r=>r.xid===xid&&r.from===X&&!r.done);rs.forEach(r=>rmSettle(r.id));S.settle=S.settle.filter(r=>!rs.includes(r))}
   else if(d.xe!==undefined){openDlg(d.xe);return}
-  else if(d.addx!==undefined){openDlg();return}
+  else if(d.addx!==undefined){openDlg(undefined,true);return}
   else if(d.ma!==undefined){if(S.members.length>=10)return alert('メンバーは10人までです。');S.members.push({id:'m'+uid().slice(-6),name:'メンバー'+(S.members.length+1)});syncMeta()}
   else if(d.mr!==undefined){if(S.items.some(x=>x.pay===d.mr)||S.settle.some(r=>r.from===d.mr||r.to===d.mr))return alert('このメンバーは、支払いや精算の記録があるため削除できません。');if(!confirm('このメンバーを削除しますか？'))return;S.members=S.members.filter(m=>m.id!==d.mr);syncMeta()}
   renderCost();renderList();renderPack();
