@@ -192,6 +192,14 @@ dialog:focus{outline:none}
 
 <div id="maint" hidden><div class="mbox"><h1>メンテナンス中</h1><p id="mtext"></p><button class="mini" id="madm" type="button">管理者の方はこちら</button></div></div>
 
+<dialog id="dlgPM" autofocus tabindex="-1">
+  <h2>精算方法を選ぶ</h2>
+  <p class="sub" id="pmsub" style="margin:0 0 10px"></p>
+  <div class="days" id="pmchips" style="flex-wrap:wrap"></div>
+  <input id="pmother" maxlength="20" placeholder="精算方法を入力（例：ゆうちょ）" hidden style="margin-top:10px">
+  <div class="acts"><button type="button" id="pmcancel">キャンセル</button><button type="button" class="pri" id="pmok">精算済みにする</button></div>
+</dialog>
+
 <dialog id="dlgA" autofocus tabindex="-1">
   <h2>管理</h2>
   <div id="abody"></div>
@@ -346,6 +354,26 @@ function renderPack(){
 let openEx=new Set();
 function shareMap(x){const sh=shareIds(x),k=sh.length,v=+x.cost||0,base=Math.floor(v/k),r=v-base*k,m={};sh.forEach((id,j)=>{m[id]=base+(j<r?1:0)});return m}
 let RP={};
+const PM=['現金','口座振込','PayPay','LINE Pay'];
+let pmSel='現金',pmCb=null;
+function renderPM(){
+  $('pmchips').innerHTML=[...PM,'その他'].map(m=>`<button type="button" data-pm="${m}" aria-pressed="${pmSel===m}">${m}</button>`).join('');
+  $('pmother').hidden=pmSel!=='その他';
+}
+function askMethod(sub,cb){
+  pmCb=cb;let last='';try{last=localStorage.getItem('futari-paymethod')||''}catch(e){}
+  pmSel=PM.includes(last)?last:(last?'その他':'現金');$('pmother').value=(last&&!PM.includes(last))?last:'';
+  $('pmsub').textContent=sub;renderPM();$('dlgPM').showModal();
+  if(document.activeElement&&document.activeElement!==$('dlgPM'))document.activeElement.blur();
+}
+$('pmchips').onclick=e=>{const b=e.target.closest('[data-pm]');if(!b)return;pmSel=b.dataset.pm;renderPM()};
+$('pmcancel').onclick=()=>{pmCb=null;$('dlgPM').close()};
+$('pmok').onclick=()=>{
+  const m=pmSel==='その他'?($('pmother').value.trim()||'その他'):pmSel;
+  try{localStorage.setItem('futari-paymethod',m)}catch(e){}
+  $('dlgPM').close();const cb=pmCb;pmCb=null;if(cb)cb(m);
+  renderCost();renderList();renderPack();
+};
 function computeRP(){
   RP={};const c=calc(),ids=mIds(),byX={};
   c.plan.forEach(p=>{(byX[p.from]=byX[p.from]||[]).push({to:p.to,left:p.a})});
@@ -409,7 +437,7 @@ function renderCost(){
   const per=Array.from({length:S.days},(_,i)=>S.items.filter(x=>x.day===i).reduce((a,x)=>a+(+x.cost||0),0));
   const recs=S.settle.filter(r=>!r.done),dones=S.settle.filter(r=>r.done);
   const anySettled=dones.length>0||S.items.some(x=>x.settled);
-  const sr=r=>`${esc(mName(r.from))}は${esc(mName(r.to))}に${yen(r.amount)} 精算済み${r.xid?'（'+esc((S.items.find(i=>i.id===r.xid)||{}).title||'')+'）':''}`;
+  const sr=r=>`${esc(mName(r.from))}は${esc(mName(r.to))}に${yen(r.amount)} 精算済み${r.method?'（'+esc(r.method)+'）':''}${r.xid?'（'+esc((S.items.find(i=>i.id===r.xid)||{}).title||'')+'）':''}`;
   let st;
   if(c.plan.length)st=c.plan.map(p=>`<div class="line"><span>${esc(mName(p.from))} → ${esc(mName(p.to))}</span><span><b>${yen(p.a)}</b> <button class="mini" data-pay="${esc(p.from)}|${esc(p.to)}|${p.a}">精算済みにする</button></span></div>`).join('');
   else if(S.settle.length)st='<div class="ok" style="padding:6px 0">すべて精算済みです</div>';
@@ -421,7 +449,7 @@ function renderCost(){
   const exRows=ex.map(x=>{const ok=ids.includes(x.pay),sh=shareIds(x),done=isDone(x),open=openEx.has(x.id);
     const rs=ok&&!x.settled?shareIds(x).filter(i=>i!==x.pay).map(i=>({i,r:RP[x.id+'|'+i]})).filter(z=>z.r):[];
     const dn=rs.filter(z=>z.r.done),pend=rs.filter(z=>!z.r.done&&z.r.amt>0);
-    const lines=rs.map(({i,r})=>r.done?`<div class="line"><span>${esc(mName(i))} → ${S.settle.filter(q=>q.xid===x.id&&q.from===i).map(q=>esc(mName(q.to))+' '+yen(q.amount)).join('、')} <span class="ok">精算済み</span></span><button class="mini" data-xu="${x.id}|${esc(i)}">取り消し</button></div>`:r.amt>0?`<div class="line"><span>${esc(mName(i))} → ${r.parts.map(p=>esc(mName(p.to))+' '+yen(p.a)).join('、')}</span><button class="mini" data-xp="${x.id}|${esc(i)}">精算済みにする</button></div>`:`<div class="line"><span class="sub">${esc(mName(i))}：精算不要（全体の差し引きで相殺）</span></div>`).join('');
+    const lines=rs.map(({i,r})=>r.done?`<div class="line"><span>${esc(mName(i))} → ${S.settle.filter(q=>q.xid===x.id&&q.from===i).map(q=>esc(mName(q.to))+' '+yen(q.amount)).join('、')} <span class="ok">精算済み${(()=>{const mm=[...new Set(S.settle.filter(q=>q.xid===x.id&&q.from===i&&q.method).map(q=>q.method))].join("・");return mm?"（"+esc(mm)+"）":""})()}</span></span><button class="mini" data-xu="${x.id}|${esc(i)}">取り消し</button></div>`:r.amt>0?`<div class="line"><span>${esc(mName(i))} → ${r.parts.map(p=>esc(mName(p.to))+' '+yen(p.a)).join('、')}</span><button class="mini" data-xp="${x.id}|${esc(i)}">精算済みにする</button></div>`:`<div class="line"><span class="sub">${esc(mName(i))}：精算不要（全体の差し引きで相殺）</span></div>`).join('');
     const detail=!rs.length?'':(dn.length+pend.length===0?'<div class="sub" style="margin-top:6px">この費用は、全体の差し引きで精算不要です</div>':`<div style="margin-top:8px"><button class="mini" data-xt="${x.id}">個別に精算（${dn.length}/${dn.length+pend.length}）${open?' ▴':' ▾'}</button>${open?lines+'<div class="sub" style="margin-top:6px">支払い先は、全体の精算（差し引き）に合わせて表示しています。</div>':''}</div>`);
     return `<div class="exr ${done?'st':''}"><div class="exh" data-xe="${x.id}"><div><div class="ext">${esc(x.title)} <span class="pen">✎</span>${done?'<span class="stb">精算済み</span>':''}</div><div class="exs ${ok?'':'warn'}">${ok?esc(mName(x.pay))+'が立て替え':'支払った人が未設定'} (${dtxt(x)})</div><div class="chips">${S.members.map(m=>`<span class="chip ${sh.includes(m.id)?'on':''}">${esc([...m.name][0]||'?')}</span>`).join('')}</div></div><div class="exa">${yen(x.cost)}</div></div>${detail}</div>`}).join('');
   $('cost').innerHTML=`<div class="sum"><div class="sub">合計</div><div class="big">${yen(tot)}</div>
@@ -715,13 +743,13 @@ $('cost').onchange=e=>{const id=e.target.dataset.mn;if(id===undefined)return;con
 $('cost').onclick=e=>{
   const t=e.target.closest('[data-pay],[data-rmset],[data-redo],[data-xe],[data-addx],[data-ma],[data-mr],[data-xt],[data-xp],[data-xu]');if(!t)return;
   const d=t.dataset;
-  if(d.pay!==undefined){const [f,to,a]=d.pay.split('|');const r={id:uid(),from:f,to:to,amount:+a,at:Date.now(),done:false};S.settle.push(r);putSettle(r);
-    finalizeIfClear()}
+  if(d.pay!==undefined){const [f,to,a]=d.pay.split('|');
+    askMethod(mName(f)+' → '+mName(to)+'  '+yen(+a),m=>{const r={id:uid(),from:f,to:to,amount:+a,at:Date.now(),done:false,method:m};S.settle.push(r);putSettle(r);finalizeIfClear()});return}
   else if(d.rmset!==undefined){rmSettle(d.rmset);S.settle=S.settle.filter(r=>r.id!==d.rmset)}
   else if(d.redo!==undefined){if(!confirm('精算済みを元に戻しますか？'))return;S.items.forEach(x=>{if(x.settled){x.settled=false;putItem(x)}});S.settle.forEach(q=>{if(q.done){q.done=false;putSettle(q)}})}
   else if(d.xt!==undefined){if(openEx.has(d.xt))openEx.delete(d.xt);else openEx.add(d.xt)}
   else if(d.xp!==undefined){computeRP();const r=RP[d.xp];if(!r||r.done||!r.parts.length)return;const [xid,X]=d.xp.split('|');
-    r.parts.forEach(p=>{const rec={id:'ex_'+xid+'_'+X+'_'+p.to,from:X,to:p.to,amount:p.a,at:Date.now(),done:false,xid};S.settle.push(rec);putSettle(rec)});finalizeIfClear()}
+    askMethod(mName(X)+' → '+r.parts.map(p=>mName(p.to)+' '+yen(p.a)).join('、'),m=>{r.parts.forEach(p=>{const rec={id:'ex_'+xid+'_'+X+'_'+p.to,from:X,to:p.to,amount:p.a,at:Date.now(),done:false,xid,method:m};S.settle.push(rec);putSettle(rec)});finalizeIfClear()});return}
   else if(d.xu!==undefined){const [xid,X]=d.xu.split('|');const rs=S.settle.filter(r=>r.xid===xid&&r.from===X&&!r.done);rs.forEach(r=>rmSettle(r.id));S.settle=S.settle.filter(r=>!rs.includes(r))}
   else if(d.xe!==undefined){openDlg(d.xe);return}
   else if(d.addx!==undefined){openDlg(undefined,true);return}
