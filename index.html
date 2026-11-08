@@ -243,7 +243,10 @@ let fs;try{fs=initializeFirestore(app,{localCache:persistentLocalCache({tabManag
 if('serviceWorker' in navigator)navigator.serviceWorker.register('sw.js').catch(()=>{});
 const TK='futari-trip-id';
 let TID=(location.hash.match(/^#t=([A-Za-z0-9_-]{12,40})$/)||[])[1];
-try{if(!TID)TID=localStorage.getItem(TK)}catch(e){}
+{let saved='';try{saved=localStorage.getItem(TK)||''}catch(e){}
+ /* ホーム画面のアプリは、追加した時のURL（最初の旅）で起動するため、最後に開いた旅を優先する */
+ const standaloneLaunch=navigator.standalone===true||(window.matchMedia&&matchMedia('(display-mode: standalone)').matches);
+ if(saved&&(standaloneLaunch||!TID))TID=saved}
 if(!TID)TID=Array.from(crypto.getRandomValues(new Uint8Array(20)),b=>'abcdefghijkmnpqrstuvwxyz23456789'[b%32]).join('');
 try{localStorage.setItem(TK,TID)}catch(e){}
 history.replaceState(null,'','#t='+TID);
