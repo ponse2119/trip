@@ -68,6 +68,10 @@ body.ro #cost button{display:none}
 body.ro .exh{pointer-events:none}
 #dlg.xm [data-xh]{display:none}
 body.ro [data-bk]{display:none}
+.sws{display:flex;flex-wrap:wrap;gap:12px}
+.swi{display:flex;flex-direction:column;align-items:center;gap:4px;font-size:11px;color:var(--sub);background:none;border:0;cursor:pointer;padding:0}
+.swi i{display:block;width:44px;height:44px;border-radius:50%;border:3px solid transparent;box-shadow:0 0 0 1px var(--line) inset}
+.swi[aria-pressed=true] i{border-color:var(--ink);box-shadow:0 0 0 3px #fff inset}
 .gh{font:700 16px "Shippori Mincho B1","Hiragino Mincho ProN",serif;margin:18px 0 8px;padding-left:10px;border-left:4px solid var(--ac)}
 .nx{display:inline-block;background:var(--ac);color:var(--acink);border-radius:8px;padding:0 8px;font-size:12px;font-weight:700;margin-bottom:4px}
 .tk.next{border-color:var(--ac);box-shadow:0 0 0 2px var(--ac)}
@@ -138,7 +142,7 @@ dialog:focus{outline:none}
     <label style="margin:0">行き先 <input id="dest" maxlength="20" placeholder="例：福岡（天気用）" style="width:150px"></label>
     <span class="count" id="countdown"></span>
   </div>
-  <div class="sub" style="margin-top:8px;display:flex;gap:8px;align-items:center;flex-wrap:wrap"><span id="sync">📱 この端末のみ保存</span><button id="cp" class="mini">リンクをコピー</button><button id="sw" class="mini">コード入力</button><button id="adm" class="mini" type="button">管理</button></div>
+  <div class="sub" style="margin-top:8px;display:flex;gap:8px;align-items:center;flex-wrap:wrap"><span id="sync">📱 この端末のみ保存</span><button id="cp" class="mini">リンクをコピー</button><button id="sw" class="mini">コード入力</button><button id="adm" class="mini" type="button">管理</button><button id="thm" class="mini" type="button">色</button></div>
 </header>
 <nav class="tabs" role="tablist">
   <button role="tab" data-tab="plan" aria-selected="true">予定</button>
@@ -191,6 +195,17 @@ dialog:focus{outline:none}
 </dialog>
 
 <div id="maint" hidden><div class="mbox"><h1>メンテナンス中</h1><p id="mtext"></p><button class="mini" id="madm" type="button">管理者の方はこちら</button></div></div>
+
+<dialog id="dlgC" autofocus tabindex="-1">
+  <h2>テーマカラー</h2>
+  <div class="sws" id="sws"></div>
+  <label for="cpick">好きな色を選ぶ</label>
+  <input type="color" id="cpick" value="#d9442e" style="padding:4px">
+  <p class="sub" style="margin:8px 0 0">文字が読みにくい色は、自動で濃く調整されます。</p>
+  <label style="display:flex;gap:8px;align-items:center;margin-top:14px;color:var(--ink);font-size:14px"><input type="checkbox" id="cscope" style="width:22px;height:22px;flex:0 0 auto;accent-color:var(--ac)"> この旅の全員に反映する</label>
+  <p class="sub" style="margin:4px 0 0" id="cnote"></p>
+  <div class="acts"><button type="button" id="creset">もとの色に戻す</button><button type="button" class="pri" id="cclose">閉じる</button></div>
+</dialog>
 
 <dialog id="dlgPM" autofocus tabindex="-1">
   <h2>精算方法を選ぶ</h2>
@@ -256,13 +271,13 @@ const shim={
   collection:c=>{const cr=collection(fs,'trips',TID,c);return{doc:id=>{const r=doc(fs,'trips',TID,c,id);return{set:d=>setDoc(r,d),delete:()=>deleteDoc(r)}},onSnapshot:n=>onSnapshot(cr,q=>n({docs:q.docs.map(d=>({data:()=>d.data()}))}),bad)}}
 };
 const KEY='futari-trip-v1';
-let S={title:'ふたりの旅',start:'',days:3,members:[{id:'0',name:'自分'},{id:'1',name:'彼女'}],settle:[],dest:'',mode:'normal',mmsg:'',pw:'',items:[],pack:[],wish:[]};
+let S={title:'ふたりの旅',start:'',days:3,members:[{id:'0',name:'自分'},{id:'1',name:'彼女'}],settle:[],dest:'',theme:'',mode:'normal',mmsg:'',pw:'',items:[],pack:[],wish:[]};
 try{const r=localStorage.getItem(KEY);if(r)S=Object.assign(S,JSON.parse(r))}catch(e){}
 let cur=0,editId=null;
 const $=id=>document.getElementById(id);
 const save=()=>{try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}};
 let db=null,mt;const ig=()=>{};
-const syncMeta=()=>{if(RO())return;if(!db)return save();clearTimeout(mt);mt=setTimeout(()=>db.doc('trip/meta').set({title:S.title,start:S.start,days:S.days,members:S.members,names:S.members.map(m=>m.name),dest:S.dest||''}).catch(ig),400)};
+const syncMeta=()=>{if(RO())return;if(!db)return save();clearTimeout(mt);mt=setTimeout(()=>db.doc('trip/meta').set({title:S.title,start:S.start,days:S.days,members:S.members,names:S.members.map(m=>m.name),dest:S.dest||'',theme:S.theme||''}).catch(ig),400)};
 const putItem=it=>{if(RO())return;if(!db)return save();db.collection('items').doc(it.id).set(it).catch(ig)};
 const rmItem=id=>{if(RO())return;if(!db)return save();db.collection('items').doc(id).delete().catch(ig)};
 const putPack=p=>{if(RO())return;if(!db)return save();db.collection('pack').doc(p.id).set(p).catch(ig)};
@@ -280,6 +295,7 @@ function dayLabel(i){const d=dayDate(i);return d?`${d.getMonth()+1}/${d.getDate(
 function dayWk(i){const d=dayDate(i);return d?W[d.getDay()]:''}
 
 function head(){
+  applyTheme();
   const te=trips.find(t=>t.id===TID);if(te&&te.name!==S.title){te.name=S.title;saveTrips()}
   if(document.activeElement!==$('title'))$('title').value=S.title;$('start').value=S.start;if(document.activeElement!==$('dest'))$('dest').value=S.dest||'';$('ndays').value=S.days;
   const c=$('countdown');
@@ -357,6 +373,43 @@ function renderPack(){
 let openEx=new Set();
 function shareMap(x){const sh=shareIds(x),k=sh.length,v=+x.cost||0,base=Math.floor(v/k),r=v-base*k,m={};sh.forEach((id,j)=>{m[id]=base+(j<r?1:0)});return m}
 let RP={};
+const THEMES=[['赤','#d9442e'],['オレンジ','#d9730d'],['緑','#2e8b57'],['青緑','#168a8a'],['青','#2563c9'],['紫','#7a4fd6'],['ピンク','#d6457f'],['墨','#3b4a5a']];
+const THK='futari-theme',DEF_COLOR='#d9442e';
+const hx=h=>{h=h.replace('#','');return[0,2,4].map(i=>parseInt(h.substr(i,2),16))};
+const rgbHex=a=>'#'+a.map(v=>Math.round(Math.max(0,Math.min(255,v))).toString(16).padStart(2,'0')).join('');
+const lum=a=>{const f=v=>{v/=255;return v<=.03928?v/12.92:Math.pow((v+.055)/1.055,2.4)};return .2126*f(a[0])+.7152*f(a[1])+.0722*f(a[2])};
+const cratio=(a,b)=>{const x=lum(a),y=lum(b);return(Math.max(x,y)+.05)/(Math.min(x,y)+.05)};
+const mixc=(a,b,t)=>a.map((v,i)=>v*(1-t)+b[i]*t);
+function darkenFor(a,bg,min){let c=a;for(let i=0;i<40&&cratio(c,bg)<min;i++)c=mixc(c,[0,0,0],.07);return c}
+const devColor=()=>{try{return localStorage.getItem(THK)||''}catch(e){return ''}};
+const effColor=()=>devColor()||S.theme||'';
+function applyTheme(col){
+  col=col===undefined?effColor():col;
+  const r=document.documentElement.style;
+  if(!/^#[0-9a-fA-F]{6}$/.test(col||'')){['--ac','--acink','--sun','--link'].forEach(k=>r.removeProperty(k));return}
+  const a=hx(col),ac=darkenFor(a,[255,255,255],4.5);
+  r.setProperty('--ac',rgbHex(ac));r.setProperty('--acink','#ffffff');
+  r.setProperty('--sun',rgbHex(mixc(a,[255,255,255],.5)));
+  r.setProperty('--link',rgbHex(darkenFor(mixc(ac,[0,0,0],.12),[255,255,255],4.5)));
+}
+function renderTheme(){
+  const cur=(effColor()||DEF_COLOR).toLowerCase();
+  $('sws').innerHTML=THEMES.map(([n,c])=>`<button type="button" class="swi" data-c="${c}" aria-pressed="${cur===c}" aria-label="${n}"><i style="background:${c}"></i>${n}</button>`).join('');
+  $('cpick').value=/^#[0-9a-f]{6}$/.test(cur)?cur:DEF_COLOR;
+  $('cscope').disabled=RO();
+  $('cnote').textContent=devColor()?'いまは、この端末だけの色を使っています。':(S.theme?'いまは、この旅の全員に反映された色です。':'');
+}
+function commitColor(c){
+  if($('cscope').checked&&!RO()){try{localStorage.removeItem(THK)}catch(e){}setMeta({theme:c})}
+  else{try{localStorage.setItem(THK,c)}catch(e){}}
+  applyTheme();renderTheme();
+}
+$('thm').onclick=()=>{$('cscope').checked=false;renderTheme();$('dlgC').showModal();if(document.activeElement&&document.activeElement!==$('dlgC'))document.activeElement.blur()};
+$('cclose').onclick=()=>$('dlgC').close();
+$('sws').onclick=e=>{const b=e.target.closest('[data-c]');if(b)commitColor(b.dataset.c)};
+$('cpick').oninput=e=>applyTheme(e.target.value);
+$('cpick').onchange=e=>commitColor(e.target.value);
+$('creset').onclick=()=>{try{localStorage.removeItem(THK)}catch(e){}if($('cscope').checked&&!RO())setMeta({theme:''});applyTheme();renderTheme()};
 const PM=['現金','口座振込','PayPay','LINE Pay'];
 let pmSel='現金',pmCb=null;
 function renderPM(){
@@ -475,7 +528,7 @@ if(!Array.isArray(folders))folders=[];
 const saveTrips=()=>{try{localStorage.setItem(TL,JSON.stringify(trips));localStorage.setItem(FL,JSON.stringify(folders))}catch(e){}};
 let ent=trips.find(t=>t.id===TID);
 if(!ent){ent={id:TID,name:S.title||'ふたりの旅',folder:''};trips.push(ent);saveTrips()}
-Object.assign(S,{title:ent.name||'ふたりの旅',start:'',days:3,members:[{id:'0',name:'自分'},{id:'1',name:'彼女'}],settle:[],dest:'',mode:'normal',mmsg:'',pw:'',items:[],pack:[],wish:[]});
+Object.assign(S,{title:ent.name||'ふたりの旅',start:'',days:3,members:[{id:'0',name:'自分'},{id:'1',name:'彼女'}],settle:[],dest:'',theme:'',mode:'normal',mmsg:'',pw:'',items:[],pack:[],wish:[]});
 const newId=()=>Array.from(crypto.getRandomValues(new Uint8Array(20)),b=>'abcdefghijkmnpqrstuvwxyz23456789'[b%32]).join('');
 function goTrip(id){try{localStorage.setItem(TK,id)}catch(e){}location.hash='t='+id;location.reload()}
 const folderList=()=>[...new Set([...folders,...trips.map(t=>t.folder).filter(Boolean)])];
@@ -767,9 +820,9 @@ all();
   db=shim;
   setSync();
   db.doc('trip/meta').onSnapshot(s=>{
-    if(s.exists){const d=s.data();S.title=d.title??S.title;S.start=d.start||'';S.days=d.days||S.days;if(Array.isArray(d.members)&&d.members.length)S.members=d.members;else if(Array.isArray(d.names)&&d.names.length)S.members=d.names.map((n,i)=>({id:String(i),name:n}));S.dest=d.dest||'';metaReady=true;S.mode=d.mode||'normal';S.mmsg=d.mmsg||'';S.pw=d.pw||'';if(!didAuto&&S.start){didAuto=true;const t0=new Date();t0.setHours(0,0,0,0);const k=Math.round((t0-new Date(S.start+'T00:00:00'))/864e5);if(k>=0&&k<S.days)cur=k}
+    if(s.exists){const d=s.data();S.title=d.title??S.title;S.start=d.start||'';S.days=d.days||S.days;if(Array.isArray(d.members)&&d.members.length)S.members=d.members;else if(Array.isArray(d.names)&&d.names.length)S.members=d.names.map((n,i)=>({id:String(i),name:n}));S.dest=d.dest||'';S.theme=d.theme||'';metaReady=true;S.mode=d.mode||'normal';S.mmsg=d.mmsg||'';S.pw=d.pw||'';if(!didAuto&&S.start){didAuto=true;const t0=new Date();t0.setHours(0,0,0,0);const k=Math.round((t0-new Date(S.start+'T00:00:00'))/864e5);if(k>=0&&k<S.days)cur=k}
       if(cur>=S.days)cur=S.days-1;migrateSp();all();loadWeather()}
-    else{db.doc('trip/meta').set({title:S.title,start:S.start,days:S.days,members:S.members,names:S.members.map(m=>m.name),dest:S.dest||''}).catch(ig);
+    else{db.doc('trip/meta').set({title:S.title,start:S.start,days:S.days,members:S.members,names:S.members.map(m=>m.name),dest:S.dest||'',theme:S.theme||''}).catch(ig);
       }
   },ig);
   db.collection('items').onSnapshot(q=>{S.items=q.docs.map(d=>d.data());migrateSp();renderList();renderCost()},ig);
