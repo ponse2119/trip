@@ -68,6 +68,7 @@ body.ro #cost button{display:none}
 body.ro .exh{pointer-events:none}
 #dlg.xm [data-xh]{display:none}
 body.ro [data-bk]{display:none}
+.pdot{width:22px;height:22px;border-radius:50%;box-shadow:0 0 0 1px var(--line) inset;flex:0 0 auto}
 .sws{display:flex;flex-wrap:wrap;gap:12px}
 .swi{display:flex;flex-direction:column;align-items:center;gap:4px;font-size:11px;color:var(--sub);background:none;border:0;cursor:pointer;padding:0}
 .swi i{display:block;width:44px;height:44px;border-radius:50%;border:3px solid transparent;box-shadow:0 0 0 1px var(--line) inset}
@@ -208,6 +209,9 @@ dialog:focus{outline:none}
   <div class="sws" id="bws"></div>
   <label for="bpick">好きな背景色を選ぶ</label>
   <input type="color" id="bpick" value="#eef4fb" style="padding:4px">
+  <div class="sub" style="margin:18px 0 6px">マイプリセット（メインの色と背景の組み合わせ）</div>
+  <div id="mypre"></div>
+  <button type="button" class="mini" id="presave" style="margin-top:8px">＋ いまの色を登録</button>
   <p class="sub" style="margin:8px 0 0">文字が読みにくい色は、自動で調整されます。</p>
   <label style="display:flex;gap:8px;align-items:center;margin-top:14px;color:var(--ink);font-size:14px"><input type="checkbox" id="cscope" style="width:22px;height:22px;flex:0 0 auto;accent-color:var(--ac)"> この旅の全員に反映する</label>
   <p class="sub" style="margin:4px 0 0" id="cnote"></p>
@@ -420,6 +424,7 @@ function applyTheme(col,bg){
 }
 function swatches(list,attr,cur){return list.map(([n,c])=>`<button type="button" class="swi" data-${attr}="${c}" aria-pressed="${cur===c}" aria-label="${n}"><i style="background:${c}"></i>${n}</button>`).join('')}
 function renderTheme(){
+  renderPre();
   const cc=(effColor()||DEF_COLOR).toLowerCase(),cb=(effBg()||DEF_BG).toLowerCase();
   $('sws').innerHTML=swatches(THEMES,'c',cc);$('sws2').innerHTML=swatches(PASTELS,'c',cc);$('bws').innerHTML=swatches(BGS,'b',cb);
   $('cpick').value=okHex(cc)?cc:DEF_COLOR;$('bpick').value=okHex(cb)?cb:DEF_BG;
@@ -437,7 +442,26 @@ function commitKV(kind,val){
 }
 $('thm').onclick=()=>{$('cscope').checked=false;renderTheme();$('dlgC').showModal();if(document.activeElement&&document.activeElement!==$('dlgC'))document.activeElement.blur()};
 $('cclose').onclick=()=>$('dlgC').close();
-$('dlgC').onclick=e=>{const c=e.target.closest('[data-c]'),b=e.target.closest('[data-b]');if(c)commitKV('theme',c.dataset.c);else if(b)commitKV('bg',b.dataset.b)};
+const PSK='futari-presets';
+let presets=[];try{presets=JSON.parse(localStorage.getItem(PSK)||'[]')}catch(e){}
+if(!Array.isArray(presets))presets=[];
+const savePresets=()=>{try{localStorage.setItem(PSK,JSON.stringify(presets))}catch(e){}};
+function renderPre(){
+  $('mypre').innerHTML=presets.length?presets.map(p=>`<div class="item" style="align-items:center;padding:8px 12px;margin-bottom:8px"><div class="body" data-pu="${p.id}" style="cursor:pointer"><div class="t" style="font-size:15px">${esc(p.name)}</div><div class="sub" style="font-size:12px">タップで使う</div></div><span class="pdot" style="background:${esc(p.c)}"></span><span class="pdot" style="background:${esc(p.b)}"></span><button type="button" class="del" data-pd="${p.id}" aria-label="削除">×</button></div>`).join(''):'<div class="sub">登録した色の組み合わせは、まだありません。</div>';
+}
+$('presave').onclick=()=>{
+  if(presets.length>=20)return alert('登録できるのは、20個までです。');
+  const n=(prompt('プリセットの名前',`プリセット${presets.length+1}`)||'').trim();if(!n)return;
+  presets.push({id:uid(),name:n.slice(0,20),c:(effColor()||DEF_COLOR).toLowerCase(),b:(effBg()||DEF_BG).toLowerCase()});
+  savePresets();renderPre();
+};
+$('dlgC').onclick=e=>{
+  const c=e.target.closest('[data-c]'),b=e.target.closest('[data-b]'),u=e.target.closest('[data-pu]'),d=e.target.closest('[data-pd]');
+  if(c)commitKV('theme',c.dataset.c);
+  else if(b)commitKV('bg',b.dataset.b);
+  else if(u){const p=presets.find(z=>z.id===u.dataset.pu);if(p){commitKV('theme',p.c);commitKV('bg',p.b)}}
+  else if(d&&confirm('このプリセットを削除しますか？')){presets=presets.filter(z=>z.id!==d.dataset.pd);savePresets();renderPre()}
+};
 $('cpick').oninput=e=>applyTheme(e.target.value,undefined);
 $('cpick').onchange=e=>commitKV('theme',e.target.value);
 $('bpick').oninput=e=>applyTheme(undefined,e.target.value);
