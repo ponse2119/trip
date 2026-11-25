@@ -278,13 +278,13 @@ const shim={
   collection:c=>{const cr=collection(fs,'trips',TID,c);return{doc:id=>{const r=doc(fs,'trips',TID,c,id);return{set:d=>setDoc(r,d),delete:()=>deleteDoc(r)}},onSnapshot:n=>onSnapshot(cr,q=>n({docs:q.docs.map(d=>({data:()=>d.data()}))}),bad)}}
 };
 const KEY='futari-trip-v1';
-let S={title:'ふたりの旅',start:'',days:3,members:[{id:'0',name:'自分'},{id:'1',name:'彼女'}],settle:[],dest:'',theme:'',bg:'',mode:'normal',mmsg:'',pw:'',items:[],pack:[],wish:[]};
+let S={title:'ふたりの旅',start:'',days:3,members:[{id:'0',name:'自分'},{id:'1',name:'彼女'}],settle:[],dest:'',theme:'',bg:'',themeAt:0,bgAt:0,mode:'normal',mmsg:'',pw:'',items:[],pack:[],wish:[]};
 try{const r=localStorage.getItem(KEY);if(r)S=Object.assign(S,JSON.parse(r))}catch(e){}
 let cur=0,editId=null;
 const $=id=>document.getElementById(id);
 const save=()=>{try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}};
 let db=null,mt;const ig=()=>{};
-const syncMeta=()=>{if(RO())return;if(!db)return save();clearTimeout(mt);mt=setTimeout(()=>db.doc('trip/meta').set({title:S.title,start:S.start,days:S.days,members:S.members,names:S.members.map(m=>m.name),dest:S.dest||'',theme:S.theme||'',bg:S.bg||''}).catch(ig),400)};
+const syncMeta=()=>{if(RO())return;if(!db)return save();clearTimeout(mt);mt=setTimeout(()=>db.doc('trip/meta').set({title:S.title,start:S.start,days:S.days,members:S.members,names:S.members.map(m=>m.name),dest:S.dest||''}).catch(ig),400)};
 const putItem=it=>{if(RO())return;if(!db)return save();db.collection('items').doc(it.id).set(it).catch(ig)};
 const rmItem=id=>{if(RO())return;if(!db)return save();db.collection('items').doc(id).delete().catch(ig)};
 const putPack=p=>{if(RO())return;if(!db)return save();db.collection('pack').doc(p.id).set(p).catch(ig)};
@@ -390,9 +390,11 @@ const lum=a=>{const f=v=>{v/=255;return v<=.03928?v/12.92:Math.pow((v+.055)/1.05
 const cratio=(a,b)=>{const x=lum(a),y=lum(b);return(Math.max(x,y)+.05)/(Math.min(x,y)+.05)};
 const mixc=(a,b,t)=>a.map((v,i)=>v*(1-t)+b[i]*t);
 function darkenFor(a,bg,min){let c=a;for(let i=0;i<40&&cratio(c,bg)<min;i++)c=mixc(c,[0,0,0],.07);return c}
-const getDev=k=>{try{return localStorage.getItem(k)||''}catch(e){return ''}};
-const devColor=()=>getDev(THK),devBg=()=>getDev(BGK);
-const effColor=()=>devColor()||S.theme||'',effBg=()=>devBg()||S.bg||'';
+const getDevObj=k=>{try{const r=localStorage.getItem(k)||'';if(!r)return{v:'',at:0};if(r[0]==='{'){const o=JSON.parse(r);return{v:o.v||'',at:+o.at||0}}return{v:r,at:0}}catch(e){return{v:'',at:0}}};
+const devColor=()=>getDevObj(THK).v,devBg=()=>getDevObj(BGK).v;
+/* この端末の色と、旅の全員向けの色は、あとから決めたほうを使う */
+const pick=(dev,trip,tripAt)=>(dev.v&&(!trip||dev.at>=tripAt))?dev.v:(trip||'');
+const effColor=()=>pick(getDevObj(THK),S.theme,S.themeAt||0),effBg=()=>pick(getDevObj(BGK),S.bg,S.bgAt||0);
 const okHex=v=>/^#[0-9a-fA-F]{6}$/.test(v||'');
 function applyTheme(col,bg){
   col=col===undefined?effColor():col;bg=bg===undefined?effBg():bg;
@@ -422,13 +424,16 @@ function renderTheme(){
   $('sws').innerHTML=swatches(THEMES,'c',cc);$('sws2').innerHTML=swatches(PASTELS,'c',cc);$('bws').innerHTML=swatches(BGS,'b',cb);
   $('cpick').value=okHex(cc)?cc:DEF_COLOR;$('bpick').value=okHex(cb)?cb:DEF_BG;
   $('cscope').disabled=RO();
-  $('cnote').textContent=(devColor()||devBg())?'いまは、この端末だけの色を使っています。':((S.theme||S.bg)?'いまは、この旅の全員に反映された色です。':'');
+  {const dc=effColor()&&effColor()===devColor(),db_=effBg()&&effBg()===devBg(),tc=effColor()&&effColor()===S.theme,tb=effBg()&&effBg()===S.bg;
+  $('cnote').textContent=(dc||db_)?'いまは、この端末だけの色を使っています。全員に反映するときは、下のチェックを入れてから、色を選んでください。':((tc||tb)?'いまは、この旅の全員に反映された色です。':'')}
 }
 function commitKV(kind,val){
-  const key=kind==='bg'?BGK:THK;
-  if($('cscope').checked&&!RO()){try{localStorage.removeItem(key)}catch(e){}setMeta({[kind==='bg'?'bg':'theme']:val})}
-  else{try{localStorage.setItem(key,val)}catch(e){}}
+  const key=kind==='bg'?BGK:THK,now=Date.now();
+  const all=$('cscope').checked&&!RO();
+  if(all){try{localStorage.removeItem(key)}catch(e){}setMeta({[kind]:val,[kind+'At']:now})}
+  else{try{localStorage.setItem(key,JSON.stringify({v:val,at:now}))}catch(e){}}
   applyTheme();renderTheme();
+  if(all)$('cnote').textContent='この旅の全員に反映しました。';
 }
 $('thm').onclick=()=>{$('cscope').checked=false;renderTheme();$('dlgC').showModal();if(document.activeElement&&document.activeElement!==$('dlgC'))document.activeElement.blur()};
 $('cclose').onclick=()=>$('dlgC').close();
@@ -437,7 +442,7 @@ $('cpick').oninput=e=>applyTheme(e.target.value,undefined);
 $('cpick').onchange=e=>commitKV('theme',e.target.value);
 $('bpick').oninput=e=>applyTheme(undefined,e.target.value);
 $('bpick').onchange=e=>commitKV('bg',e.target.value);
-$('creset').onclick=()=>{try{localStorage.removeItem(THK);localStorage.removeItem(BGK)}catch(e){}if($('cscope').checked&&!RO())setMeta({theme:'',bg:''});applyTheme();renderTheme()};
+$('creset').onclick=()=>{try{localStorage.removeItem(THK);localStorage.removeItem(BGK)}catch(e){}if($('cscope').checked&&!RO()){const n=Date.now();setMeta({theme:'',bg:'',themeAt:n,bgAt:n})}applyTheme();renderTheme()};
 const PM=['現金','口座振込','PayPay','LINE Pay'];
 let pmSel='現金',pmCb=null;
 function renderPM(){
@@ -556,7 +561,7 @@ if(!Array.isArray(folders))folders=[];
 const saveTrips=()=>{try{localStorage.setItem(TL,JSON.stringify(trips));localStorage.setItem(FL,JSON.stringify(folders))}catch(e){}};
 let ent=trips.find(t=>t.id===TID);
 if(!ent){ent={id:TID,name:S.title||'ふたりの旅',folder:''};trips.push(ent);saveTrips()}
-Object.assign(S,{title:ent.name||'ふたりの旅',start:'',days:3,members:[{id:'0',name:'自分'},{id:'1',name:'彼女'}],settle:[],dest:'',theme:'',bg:'',mode:'normal',mmsg:'',pw:'',items:[],pack:[],wish:[]});
+Object.assign(S,{title:ent.name||'ふたりの旅',start:'',days:3,members:[{id:'0',name:'自分'},{id:'1',name:'彼女'}],settle:[],dest:'',theme:'',bg:'',themeAt:0,bgAt:0,mode:'normal',mmsg:'',pw:'',items:[],pack:[],wish:[]});
 const newId=()=>Array.from(crypto.getRandomValues(new Uint8Array(20)),b=>'abcdefghijkmnpqrstuvwxyz23456789'[b%32]).join('');
 function goTrip(id){try{localStorage.setItem(TK,id)}catch(e){}location.hash='t='+id;location.reload()}
 const folderList=()=>[...new Set([...folders,...trips.map(t=>t.folder).filter(Boolean)])];
@@ -848,9 +853,9 @@ all();
   db=shim;
   setSync();
   db.doc('trip/meta').onSnapshot(s=>{
-    if(s.exists){const d=s.data();S.title=d.title??S.title;S.start=d.start||'';S.days=d.days||S.days;if(Array.isArray(d.members)&&d.members.length)S.members=d.members;else if(Array.isArray(d.names)&&d.names.length)S.members=d.names.map((n,i)=>({id:String(i),name:n}));S.dest=d.dest||'';S.theme=d.theme||'';S.bg=d.bg||'';metaReady=true;S.mode=d.mode||'normal';S.mmsg=d.mmsg||'';S.pw=d.pw||'';if(!didAuto&&S.start){didAuto=true;const t0=new Date();t0.setHours(0,0,0,0);const k=Math.round((t0-new Date(S.start+'T00:00:00'))/864e5);if(k>=0&&k<S.days)cur=k}
+    if(s.exists){const d=s.data();S.title=d.title??S.title;S.start=d.start||'';S.days=d.days||S.days;if(Array.isArray(d.members)&&d.members.length)S.members=d.members;else if(Array.isArray(d.names)&&d.names.length)S.members=d.names.map((n,i)=>({id:String(i),name:n}));S.dest=d.dest||'';S.theme=d.theme||'';S.bg=d.bg||'';S.themeAt=+d.themeAt||0;S.bgAt=+d.bgAt||0;metaReady=true;S.mode=d.mode||'normal';S.mmsg=d.mmsg||'';S.pw=d.pw||'';if(!didAuto&&S.start){didAuto=true;const t0=new Date();t0.setHours(0,0,0,0);const k=Math.round((t0-new Date(S.start+'T00:00:00'))/864e5);if(k>=0&&k<S.days)cur=k}
       if(cur>=S.days)cur=S.days-1;migrateSp();all();loadWeather()}
-    else{db.doc('trip/meta').set({title:S.title,start:S.start,days:S.days,members:S.members,names:S.members.map(m=>m.name),dest:S.dest||'',theme:S.theme||'',bg:S.bg||''}).catch(ig);
+    else{db.doc('trip/meta').set({title:S.title,start:S.start,days:S.days,members:S.members,names:S.members.map(m=>m.name),dest:S.dest||''}).catch(ig);
       }
   },ig);
   db.collection('items').onSnapshot(q=>{S.items=q.docs.map(d=>d.data());migrateSp();renderList();renderCost()},ig);
