@@ -318,8 +318,8 @@ function renderDays(){
   $('days').innerHTML=Array.from({length:S.days},(_,i)=>{const d=dayDate(i),w=WX[i],t=d&&ymd(d)===td;
     return `<button class="${t?'today':''}" aria-pressed="${i===cur}" data-d="${i}">${i+1}日目<small>${d?(t?'今日 ':'')+dayLabel(i)+'（'+dayWk(i)+'）':'&nbsp;'}</small>${w?`<small>${WC(w.c)[0]} ${w.hi}°</small>`:''}</button>`}).join('');
   const w=WX[cur],el=$('wxline');
-  const txt=w?`${WC(w.c)[0]} ${WC(w.c)[1]}　最高${w.hi}° / 最低${w.lo}°　降水確率${w.pop??'-'}%`:(S.dest&&S.start?'天気予報は、出発の約2週間前から表示されます':'');
-  el.textContent=txt;el.hidden=!txt;
+  const txt=w?`${WC(w.c)[0]} ${WC(w.c)[1]}　最高${w.hi}° / 最低${w.lo}°　降水確率${w.pop??'-'}%`:(S.dest&&S.start?wxStatus():wxHint());
+  el.textContent=txt;el.hidden=!txt;el.style.cursor=wxMsg==='error'?'pointer':'';
 }
 const CATS={plane:['✈️','#5aa9e6'],train:['🚆','#2fb59b'],bus:['🚌','#7bb661'],food:['🍚','#f4a43a'],sight:['⛩️','#e4513a'],stay:['🏠','#9b8cf0'],other:['📌','#8a98b3']};
 function kind(t){
@@ -674,24 +674,52 @@ $('rmode').value=RM;
 $('rmode').onchange=e=>{RM=e.target.value;try{localStorage.setItem('futari-rmode',RM)}catch(x){}renderList()};
 $('alm').value=String(ALM);
 $('alm').onchange=e=>{ALM=+e.target.value;try{localStorage.setItem('futari-alarm',String(ALM))}catch(x){}};
-let WX={},wxKey='',didAuto=false;
+let WX={},wxKey='',wxMsg='',wxTok=0,didAuto=false;
 const WC=c=>c===0?['☀️','晴れ']:c<=2?['🌤️','晴れ時々くもり']:c===3?['☁️','くもり']:c<=48?['🌫️','霧']:c<=57?['🌦️','霧雨']:c<=67?['🌧️','雨']:c<=77?['❄️','雪']:c<=82?['🌦️','にわか雨']:c<=86?['❄️','雪']:['⛈️','雷雨'];
 const iso=d=>d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate());
-async function loadWeather(){
-  if(!S.dest||!S.start){WX={};wxKey='';renderDays();return}
-  const key=S.dest+'|'+S.start+'|'+S.days;if(key===wxKey)return;wxKey=key;
+async function geocode(name){
+  const strip=name.replace(/(旅行|旅|観光|出張)$/,'').replace(/(県|府|都|市|町|村)$/,'').trim();
+  const cands=[name,strip,name.split(/[\s・、,／\/]/)[0]].filter((v,i,x)=>v&&x.indexOf(v)===i);
+  for(const n of cands)for(const jp of [true,false]){
+    const g=await(await fetch('https://geocoding-api.open-meteo.com/v1/search?name='+encodeURIComponent(n)+'&language=ja&count=1'+(jp?'&countryCode=JP':''))).json();
+    if(g.results&&g.results[0])return g.results[0];
+  }
+  return null;
+}
+function wxStatus(){
+  const t0=new Date();t0.setHours(0,0,0,0);
+  if(Math.round((dayDate(S.days-1)-t0)/864e5)<0)return '';
+  if(wxMsg==='loading')return '天気を取得中…';
+  if(wxMsg==='nofound')return `「${S.dest}」の場所が見つかりません。市や駅の名前で入れてください（例：福岡、那覇）`;
+  if(wxMsg==='error')return '天気を取得できませんでした。ここをタップすると、もう一度試します。';
+  return '天気予報は、出発の約2週間前から表示されます';
+}
+function wxHint(){
+  if(!S.start&&!S.dest)return '';
+  if(S.start){const t0=new Date();t0.setHours(0,0,0,0);if(Math.round((dayDate(S.days-1)-t0)/864e5)<0)return ''}
+  if(S.start&&!S.dest)return '画面上部の「行き先」を入れると、天気予報が出ます（例：福岡）';
+  if(S.dest&&!S.start)return '出発日を入れると、天気予報が出ます';
+  return '';
+}
+async function loadWeather(force){
+  if(!S.dest||!S.start){WX={};wxKey='';wxMsg='';renderDays();return}
+  const key=S.dest+'|'+S.start+'|'+S.days;if(!force&&key===wxKey)return;wxKey=key;const tok=++wxTok;
   const t0=new Date();t0.setHours(0,0,0,0);const idx=[];
   for(let i=0;i<S.days;i++){const df=Math.round((dayDate(i)-t0)/864e5);if(df>=0&&df<=15)idx.push(i)}
-  if(!idx.length){WX={};renderDays();return}
+  if(!idx.length){WX={};wxMsg='range';renderDays();return}
+  wxMsg='loading';renderDays();
   try{
-    const g=await(await fetch('https://geocoding-api.open-meteo.com/v1/search?name='+encodeURIComponent(S.dest)+'&language=ja&count=1')).json();
-    const p=g.results&&g.results[0];if(!p){WX={};renderDays();return}
+    const p=await geocode(S.dest);if(tok!==wxTok)return;
+    if(!p){WX={};wxMsg='nofound';renderDays();return}
     const r=await(await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${p.latitude}&longitude=${p.longitude}&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max&timezone=auto&start_date=${iso(dayDate(idx[0]))}&end_date=${iso(dayDate(idx[idx.length-1]))}`)).json();
-    const o={};r.daily.time.forEach((t,k)=>{const i=idx.find(j=>iso(dayDate(j))===t);if(i!==undefined)o[i]={c:r.daily.weather_code[k],hi:Math.round(r.daily.temperature_2m_max[k]),lo:Math.round(r.daily.temperature_2m_min[k]),pop:r.daily.precipitation_probability_max[k]}});
-    WX=o;
-  }catch(e){WX={};wxKey=''}
+    if(tok!==wxTok)return;
+    if(!r.daily)throw new Error(r.reason||'no data');
+    const o={};r.daily.time.forEach((t,k)=>{const i=idx.find(j=>iso(dayDate(j))===t);if(i!==undefined&&r.daily.weather_code[k]!=null)o[i]={c:r.daily.weather_code[k],hi:Math.round(r.daily.temperature_2m_max[k]),lo:Math.round(r.daily.temperature_2m_min[k]),pop:r.daily.precipitation_probability_max[k]}});
+    WX=o;wxMsg=Object.keys(o).length?'':'range';
+  }catch(e){if(tok!==wxTok)return;WX={};wxMsg='error';wxKey=''}
   renderDays();
 }
+$('wxline').onclick=()=>{if(wxMsg==='error')loadWeather(true)};
 setInterval(()=>{if(!document.hidden)renderList()},60000);
 function setSync(){if(db)$('sync').textContent=navigator.onLine?'👫 みんなで共有中':'📴 オフライン（つながると自動で同期）'}
 addEventListener('online',setSync);addEventListener('offline',setSync);
