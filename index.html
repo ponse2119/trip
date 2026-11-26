@@ -66,6 +66,7 @@ body.ro .tk .body,body.ro .item .body{cursor:default}
 .item select.mini{max-width:112px}
 body.ro #cost button{display:none}
 body.ro .exh{pointer-events:none}
+body.ro #dd{pointer-events:none}
 #dlg.xm [data-xh]{display:none}
 body.ro [data-bk]{display:none}
 .pdot{width:22px;height:22px;border-radius:50%;box-shadow:0 0 0 1px var(--line) inset;flex:0 0 auto}
@@ -154,6 +155,7 @@ dialog:focus{outline:none}
 
 <section id="plan">
   <div class="days" id="days"></div>
+  <div style="display:flex;gap:8px;align-items:center;margin:0 0 8px"><label for="dd" class="sub" style="margin:0;white-space:nowrap">この日の行き先</label><input id="dd" maxlength="20" style="flex:1;min-width:0;border:1px solid var(--line);background:var(--card);border-radius:10px;padding:6px 10px;font-size:15px"></div>
   <div class="sub" id="wxline" hidden style="margin:0 0 10px"></div>
   <div style="margin:0 0 10px;display:flex;gap:8px;align-items:center;flex-wrap:wrap"><button class="mini" id="calDay">📅 この日をまとめてカレンダーへ</button><label class="sub" style="margin:0">通知 <select id="alm" class="mini"><option value="0">なし</option><option value="10">10分前</option><option value="30">30分前</option><option value="60">1時間前</option><option value="1440">1日前</option></select></label><label class="sub" style="margin:0">経路 <select id="rmode" class="mini"><option value="r">電車・バス</option><option value="w">徒歩</option><option value="d">車</option></select></label></div>
   <div id="list"></div>
@@ -282,13 +284,13 @@ const shim={
   collection:c=>{const cr=collection(fs,'trips',TID,c);return{doc:id=>{const r=doc(fs,'trips',TID,c,id);return{set:d=>setDoc(r,d),delete:()=>deleteDoc(r)}},onSnapshot:n=>onSnapshot(cr,q=>n({docs:q.docs.map(d=>({data:()=>d.data()}))}),bad)}}
 };
 const KEY='futari-trip-v1';
-let S={title:'ふたりの旅',start:'',days:3,members:[{id:'0',name:'自分'},{id:'1',name:'彼女'}],settle:[],dest:'',theme:'',bg:'',themeAt:0,bgAt:0,mode:'normal',mmsg:'',pw:'',items:[],pack:[],wish:[]};
+let S={title:'ふたりの旅',start:'',days:3,members:[{id:'0',name:'自分'},{id:'1',name:'彼女'}],settle:[],dest:'',dayDest:{},theme:'',bg:'',themeAt:0,bgAt:0,mode:'normal',mmsg:'',pw:'',items:[],pack:[],wish:[]};
 try{const r=localStorage.getItem(KEY);if(r)S=Object.assign(S,JSON.parse(r))}catch(e){}
 let cur=0,editId=null;
 const $=id=>document.getElementById(id);
 const save=()=>{try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}};
 let db=null,mt;const ig=()=>{};
-const syncMeta=()=>{if(RO())return;if(!db)return save();clearTimeout(mt);mt=setTimeout(()=>db.doc('trip/meta').set({title:S.title,start:S.start,days:S.days,members:S.members,names:S.members.map(m=>m.name),dest:S.dest||''}).catch(ig),400)};
+const syncMeta=()=>{if(RO())return;if(!db)return save();clearTimeout(mt);mt=setTimeout(()=>db.doc('trip/meta').set({title:S.title,start:S.start,days:S.days,members:S.members,names:S.members.map(m=>m.name),dest:S.dest||'',dayDest:S.dayDest||{}}).catch(ig),400)};
 const putItem=it=>{if(RO())return;if(!db)return save();db.collection('items').doc(it.id).set(it).catch(ig)};
 const rmItem=id=>{if(RO())return;if(!db)return save();db.collection('items').doc(id).delete().catch(ig)};
 const putPack=p=>{if(RO())return;if(!db)return save();db.collection('pack').doc(p.id).set(p).catch(ig)};
@@ -318,7 +320,9 @@ function renderDays(){
   $('days').innerHTML=Array.from({length:S.days},(_,i)=>{const d=dayDate(i),w=WX[i],t=d&&ymd(d)===td;
     return `<button class="${t?'today':''}" aria-pressed="${i===cur}" data-d="${i}">${i+1}日目<small>${d?(t?'今日 ':'')+dayLabel(i)+'（'+dayWk(i)+'）':'&nbsp;'}</small>${w?`<small>${WC(w.c)[0]} ${w.hi}°</small>`:''}</button>`}).join('');
   const w=WX[cur],el=$('wxline');
-  const txt=w?`${WC(w.c)[0]} ${WC(w.c)[1]}　最高${w.hi}° / 最低${w.lo}°　降水確率${w.pop??'-'}%`:(S.dest&&S.start?wxStatus():wxHint());
+  const pl=placeOf(cur);
+  const txt=w?`${(S.dayDest&&S.dayDest[cur])?pl+'：':''}${WC(w.c)[0]} ${WC(w.c)[1]}　最高${w.hi}° / 最低${w.lo}°　降水確率${w.pop??'-'}%`:(S.start&&hasPlace()?((wxMsg!=='loading'&&wxBad.includes(pl))?nofoundMsg(pl):wxStatus()):wxHint());
+  const dd=$('dd');if(document.activeElement!==dd){dd.value=(S.dayDest&&S.dayDest[cur])||'';dd.placeholder=S.dest?S.dest+'（全体の行き先）':'例：福岡'}
   el.textContent=txt;el.hidden=!txt;el.style.cursor=wxMsg==='error'?'pointer':'';
 }
 const CATS={plane:['✈️','#5aa9e6'],train:['🚆','#2fb59b'],bus:['🚌','#7bb661'],food:['🍚','#f4a43a'],sight:['⛩️','#e4513a'],stay:['🏠','#9b8cf0'],other:['📌','#8a98b3']};
@@ -585,7 +589,7 @@ if(!Array.isArray(folders))folders=[];
 const saveTrips=()=>{try{localStorage.setItem(TL,JSON.stringify(trips));localStorage.setItem(FL,JSON.stringify(folders))}catch(e){}};
 let ent=trips.find(t=>t.id===TID);
 if(!ent){ent={id:TID,name:S.title||'ふたりの旅',folder:''};trips.push(ent);saveTrips()}
-Object.assign(S,{title:ent.name||'ふたりの旅',start:'',days:3,members:[{id:'0',name:'自分'},{id:'1',name:'彼女'}],settle:[],dest:'',theme:'',bg:'',themeAt:0,bgAt:0,mode:'normal',mmsg:'',pw:'',items:[],pack:[],wish:[]});
+Object.assign(S,{title:ent.name||'ふたりの旅',start:'',days:3,members:[{id:'0',name:'自分'},{id:'1',name:'彼女'}],settle:[],dest:'',dayDest:{},theme:'',bg:'',themeAt:0,bgAt:0,mode:'normal',mmsg:'',pw:'',items:[],pack:[],wish:[]});
 const newId=()=>Array.from(crypto.getRandomValues(new Uint8Array(20)),b=>'abcdefghijkmnpqrstuvwxyz23456789'[b%32]).join('');
 function goTrip(id){try{localStorage.setItem(TK,id)}catch(e){}location.hash='t='+id;location.reload()}
 const folderList=()=>[...new Set([...folders,...trips.map(t=>t.folder).filter(Boolean)])];
@@ -699,36 +703,47 @@ async function geocode(name){
   }
   return null;
 }
+let wxBad=[];const geoCache={};
+const hasPlace=()=>!!(S.dest||Object.values(S.dayDest||{}).some(Boolean));
+const placeOf=i=>((S.dayDest&&S.dayDest[i])||S.dest||'');
+const nofoundMsg=n=>`「${n}」の場所が見つかりません。市や駅の名前で入れてください（例：福岡、那覇）`;
 function wxStatus(){
   const t0=new Date();t0.setHours(0,0,0,0);
   if(Math.round((dayDate(S.days-1)-t0)/864e5)<0)return '';
   if(wxMsg==='loading')return '天気を取得中…';
-  if(wxMsg==='nofound')return `「${S.dest}」の場所が見つかりません。市や駅の名前で入れてください（例：福岡、那覇）`;
+  if(wxMsg==='nofound')return nofoundMsg(wxBad.join('・'));
   if(wxMsg==='error')return '天気を取得できませんでした。ここをタップすると、もう一度試します。';
   return '天気予報は、出発の約2週間前から表示されます';
 }
 function wxHint(){
-  if(!S.start&&!S.dest)return '';
+  if(!S.start&&!hasPlace())return '';
   if(S.start){const t0=new Date();t0.setHours(0,0,0,0);if(Math.round((dayDate(S.days-1)-t0)/864e5)<0)return ''}
-  if(S.start&&!S.dest)return '画面上部の「行き先」を入れると、天気予報が出ます（例：福岡）';
-  if(S.dest&&!S.start)return '出発日を入れると、天気予報が出ます';
+  if(S.start&&!hasPlace())return '画面上部の「行き先」を入れると、天気予報が出ます（例：福岡）。日ごとに変えるときは、「この日の行き先」に入れます';
+  if(hasPlace()&&!S.start)return '出発日を入れると、天気予報が出ます';
   return '';
 }
+async function geo1(n){if(geoCache[n]===undefined)geoCache[n]=await geocode(n);return geoCache[n]}
 async function loadWeather(force){
-  if(!S.dest||!S.start){WX={};wxKey='';wxMsg='';renderDays();return}
-  const key=S.dest+'|'+S.start+'|'+S.days;if(!force&&key===wxKey)return;wxKey=key;const tok=++wxTok;
-  const t0=new Date();t0.setHours(0,0,0,0);const idx=[];
-  for(let i=0;i<S.days;i++){const df=Math.round((dayDate(i)-t0)/864e5);if(df>=0&&df<=15)idx.push(i)}
-  if(!idx.length){WX={};wxMsg='range';renderDays();return}
+  if(!S.start||!hasPlace()){WX={};wxKey='';wxMsg='';renderDays();return}
+  const key=S.start+'|'+S.days+'|'+Array.from({length:S.days},(_,i)=>placeOf(i)).join(',');
+  if(!force&&key===wxKey)return;wxKey=key;const tok=++wxTok;
+  const t0=new Date();t0.setHours(0,0,0,0);const groups={};
+  for(let i=0;i<S.days;i++){const df=Math.round((dayDate(i)-t0)/864e5),pl=placeOf(i);if(pl&&df>=0&&df<=15)(groups[pl]=groups[pl]||[]).push(i)}
+  const places=Object.keys(groups);
+  if(!places.length){WX={};wxMsg='range';renderDays();return}
   wxMsg='loading';renderDays();
   try{
-    const p=await geocode(S.dest);if(tok!==wxTok)return;
-    if(!p){WX={};wxMsg='nofound';renderDays();return}
-    const r=await(await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${p.latitude}&longitude=${p.longitude}&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max&timezone=auto&start_date=${iso(dayDate(idx[0]))}&end_date=${iso(dayDate(idx[idx.length-1]))}`)).json();
-    if(tok!==wxTok)return;
-    if(!r.daily)throw new Error(r.reason||'no data');
-    const o={};r.daily.time.forEach((t,k)=>{const i=idx.find(j=>iso(dayDate(j))===t);if(i!==undefined&&r.daily.weather_code[k]!=null)o[i]={c:r.daily.weather_code[k],hi:Math.round(r.daily.temperature_2m_max[k]),lo:Math.round(r.daily.temperature_2m_min[k]),pop:r.daily.precipitation_probability_max[k]}});
-    WX=o;wxMsg=Object.keys(o).length?'':'range';
+    const o={};wxBad=[];
+    for(const pl of places){
+      const p=await geo1(pl);if(tok!==wxTok)return;
+      if(!p){wxBad.push(pl);continue}
+      const idx=groups[pl];
+      const r=await(await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${p.latitude}&longitude=${p.longitude}&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max&timezone=auto&start_date=${iso(dayDate(idx[0]))}&end_date=${iso(dayDate(idx[idx.length-1]))}`)).json();
+      if(tok!==wxTok)return;
+      if(!r.daily)throw new Error(r.reason||'no data');
+      r.daily.time.forEach((t,k)=>{const i=idx.find(j=>iso(dayDate(j))===t);if(i!==undefined&&r.daily.weather_code[k]!=null)o[i]={c:r.daily.weather_code[k],hi:Math.round(r.daily.temperature_2m_max[k]),lo:Math.round(r.daily.temperature_2m_min[k]),pop:r.daily.precipitation_probability_max[k]}});
+    }
+    WX=o;wxMsg=Object.keys(o).length?'':(wxBad.length?'nofound':'range');
   }catch(e){if(tok!==wxTok)return;WX={};wxMsg='error';wxKey=''}
   renderDays();
 }
@@ -817,6 +832,7 @@ function all(){head();renderDays();renderList();renderPack();renderWish();render
 // events
 $('title').oninput=e=>{S.title=e.target.value;syncMeta()};
 $('start').onchange=e=>{S.start=e.target.value;syncMeta();all();loadWeather()};
+$('dd').onchange=e=>{S.dayDest=Object.assign({},S.dayDest||{});S.dayDest[cur]=e.target.value.trim();syncMeta();wxKey='';loadWeather()};
 $('dest').onchange=e=>{S.dest=e.target.value.trim();syncMeta();wxKey='';loadWeather()};
 $('ndays').onchange=e=>{S.days=Math.min(30,Math.max(1,+e.target.value||1));if(cur>=S.days)cur=S.days-1;syncMeta();all();loadWeather()};
 document.querySelector('.tabs').onclick=e=>{const b=e.target.closest('button');if(!b)return;
@@ -918,9 +934,9 @@ all();
   db=shim;
   setSync();
   db.doc('trip/meta').onSnapshot(s=>{
-    if(s.exists){const d=s.data();S.title=d.title??S.title;S.start=d.start||'';S.days=d.days||S.days;if(Array.isArray(d.members)&&d.members.length)S.members=d.members;else if(Array.isArray(d.names)&&d.names.length)S.members=d.names.map((n,i)=>({id:String(i),name:n}));S.dest=d.dest||'';S.theme=d.theme||'';S.bg=d.bg||'';S.themeAt=+d.themeAt||0;S.bgAt=+d.bgAt||0;metaReady=true;S.mode=d.mode||'normal';S.mmsg=d.mmsg||'';S.pw=d.pw||'';if(!didAuto&&S.start){didAuto=true;const t0=new Date();t0.setHours(0,0,0,0);const k=Math.round((t0-new Date(S.start+'T00:00:00'))/864e5);if(k>=0&&k<S.days)cur=k}
+    if(s.exists){const d=s.data();S.title=d.title??S.title;S.start=d.start||'';S.days=d.days||S.days;if(Array.isArray(d.members)&&d.members.length)S.members=d.members;else if(Array.isArray(d.names)&&d.names.length)S.members=d.names.map((n,i)=>({id:String(i),name:n}));S.dest=d.dest||'';S.dayDest=(d.dayDest&&typeof d.dayDest==='object')?d.dayDest:{};S.theme=d.theme||'';S.bg=d.bg||'';S.themeAt=+d.themeAt||0;S.bgAt=+d.bgAt||0;metaReady=true;S.mode=d.mode||'normal';S.mmsg=d.mmsg||'';S.pw=d.pw||'';if(!didAuto&&S.start){didAuto=true;const t0=new Date();t0.setHours(0,0,0,0);const k=Math.round((t0-new Date(S.start+'T00:00:00'))/864e5);if(k>=0&&k<S.days)cur=k}
       if(cur>=S.days)cur=S.days-1;migrateSp();all();loadWeather()}
-    else{db.doc('trip/meta').set({title:S.title,start:S.start,days:S.days,members:S.members,names:S.members.map(m=>m.name),dest:S.dest||''}).catch(ig);
+    else{db.doc('trip/meta').set({title:S.title,start:S.start,days:S.days,members:S.members,names:S.members.map(m=>m.name),dest:S.dest||'',dayDest:S.dayDest||{}}).catch(ig);
       }
   },ig);
   db.collection('items').onSnapshot(q=>{S.items=q.docs.map(d=>d.data());migrateSp();renderList();renderCost()},ig);
